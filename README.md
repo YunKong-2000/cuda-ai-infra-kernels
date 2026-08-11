@@ -54,6 +54,16 @@ Requirements:
 - PyTorch with CUDA support
 - Nsight Compute for profiling scripts
 
+## Docker
+
+Start a development container from a locally pulled NVIDIA image:
+
+```bash
+scripts/docker_run.sh nvcr.io/nvidia/pytorch:<tag>
+```
+
+The container is started with all GPUs, host IPC shared memory, Nsight Compute-friendly permissions, the current user's UID/GID, and this repository mounted as the working directory. More details are in [docs/docker.md](docs/docker.md).
+
 ## Correctness
 
 ```bash

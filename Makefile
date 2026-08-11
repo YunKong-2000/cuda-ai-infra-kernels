@@ -1,10 +1,13 @@
-.PHONY: install test bench-gemm bench-rmsnorm bench-softmax profile-gemm profile-rmsnorm profile-softmax clean
+.PHONY: install test docker bench-gemm bench-rmsnorm bench-softmax profile-gemm profile-rmsnorm profile-softmax clean
 
 install:
 	pip install -e ".[dev]" --no-build-isolation
 
 test:
 	pytest tests
+
+docker:
+	scripts/docker_run.sh "$${CUDA_KERNELS_IMAGE}"
 
 bench-gemm:
 	python benchmarks/bench_gemm.py --impl tiled --m 1024 --n 1024 --k 1024
@@ -26,4 +29,3 @@ profile-softmax:
 
 clean:
 	rm -rf build dist *.egg-info
-
