@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from setuptools import find_packages, setup
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension
+
+
+ROOT = Path(__file__).parent.resolve()
 
 
 setup(
@@ -20,7 +25,7 @@ setup(
                 "csrc/rope/rope.cu",
                 "csrc/attention/attention_decode.cu",
             ],
-            include_dirs=["csrc"],
+            include_dirs=[str(ROOT / "csrc")],
             extra_compile_args={
                 "cxx": ["-O3"],
                 "nvcc": ["-O3", "--use_fast_math"],

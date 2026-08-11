@@ -54,6 +54,15 @@ Requirements:
 - PyTorch with CUDA support
 - Nsight Compute for profiling scripts
 
+For quick extension compile checks during CUDA development:
+
+```bash
+make check-skeleton
+make build-ext
+```
+
+`make check-skeleton` performs static checks for Python syntax, `setup.py` source paths, project-local includes, and pybind declarations. `make build-ext` compiles the extension in place without doing a full editable pip install.
+
 ## Docker
 
 Start a development container from a locally pulled NVIDIA image:
