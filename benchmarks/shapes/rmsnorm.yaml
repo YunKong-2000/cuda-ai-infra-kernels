@@ -1,0 +1,6 @@
+shapes:
+  - {rows: 128, hidden: 768}
+  - {rows: 512, hidden: 1024}
+  - {rows: 2048, hidden: 4096}
+  - {rows: 4096, hidden: 8192}
+

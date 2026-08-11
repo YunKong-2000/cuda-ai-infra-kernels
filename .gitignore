@@ -1,0 +1,79 @@
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.python-version
+
+# Python packaging and editable installs
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# PyTorch C++/CUDA extension build outputs
+*.so
+*.dylib
+*.dll
+*.o
+*.obj
+*.a
+*.lib
+*.exp
+*.pyd
+
+# CUDA compiler outputs and temporary files
+*.ptx
+*.cubin
+*.fatbin
+*.sass
+*.cuo
+*.cudafe*
+*.gpu
+*.ii
+*.i
+*.module_id
+
+# Profiling outputs
+*.ncu-rep
+*.nsys-rep
+*.qdrep
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Benchmark and generated result artifacts
+results/raw/*
+results/tables/*
+results/figures/*
+!results/raw/.gitkeep
+!results/tables/.gitkeep
+!results/figures/.gitkeep
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+.DS_Store
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local environment files
+.env
+.env.*
+!.env.example

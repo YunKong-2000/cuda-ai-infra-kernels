@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel", "torch"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cuda-ai-infra-kernels"
+version = "0.1.0"
+description = "CUDA kernels for AI infrastructure benchmarking and profiling."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "torch",
+  "pyyaml",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "tabulate",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["python"]
+

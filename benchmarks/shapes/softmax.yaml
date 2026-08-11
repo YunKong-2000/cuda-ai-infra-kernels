@@ -1,0 +1,6 @@
+shapes:
+  - {rows: 128, cols: 128}
+  - {rows: 512, cols: 512}
+  - {rows: 2048, cols: 2048}
+  - {rows: 4096, cols: 4096}
+
