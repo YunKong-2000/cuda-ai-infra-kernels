@@ -10,6 +10,7 @@ from cuda_ai_kernels.testing import assert_close
 def test_gemm_naive_matches_torch(shape):
     m, n, k = shape
     torch.manual_seed(0)
+    torch.backends.cuda.matmul.allow_tf32 = False  # Disable TF32 for exact comparison
     a = torch.randn((m, k), device="cuda", dtype=torch.float32)
     b = torch.randn((k, n), device="cuda", dtype=torch.float32)
 
