@@ -22,4 +22,5 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["python"]
+markers = ["cuda: tests that require a CUDA-capable GPU",]
 
