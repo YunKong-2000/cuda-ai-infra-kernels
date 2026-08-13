@@ -70,7 +70,6 @@ if [[ -n "${CUDA_KERNELS_DOCKER_EXTRA_ARGS:-}" ]]; then
 fi
 
 exec docker run \
-  --rm \
   -it \
   --name "${CONTAINER_NAME}" \
   --gpus all \
