@@ -5,16 +5,21 @@ IMPL="${1:-tiled}"
 M="${2:-4096}"
 N="${3:-4096}"
 K="${4:-4096}"
+OUTPUT="${5:-profiling.ncu-rep}"
 
 ncu \
   --target-processes all \
-  --metrics-file profiling/ncu_metrics.txt \
+  --set full \
+  --import-source yes \
+  --source-folders csrc \
+  -o "${OUTPUT}" \
   python benchmarks/bench_gemm.py \
     --impl "${IMPL}" \
     --m "${M}" \
     --n "${N}" \
     --k "${K}" \
-    --warmup 10 \
-    --repeat 20 \
+    --warmup 1 \
+    --repeat 1 \
     --profile
+  
 
