@@ -17,7 +17,7 @@ setup(
             sources=[
                 "csrc/bindings.cpp",
                 "csrc/gemm/gemm_naive.cu",
-                "csrc/gemm/gemm_tiled.cu",
+                "csrc/gemm/gemm_block_tile.cu",
                 "csrc/gemm/gemm_thread_tile.cu",
                 "csrc/gemm/gemm_warp_tile.cu",
                 "csrc/rmsnorm/rmsnorm.cu",

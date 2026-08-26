@@ -8,7 +8,7 @@
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gemm_naive", &gemm_naive, "Naive FP32 GEMM");
-  m.def("gemm_tiled", &gemm_tiled, "Shared-memory tiled FP32 GEMM");
+  m.def("gemm_block_tile", &gemm_block_tile, "Shared-memory tiled FP32 GEMM");
   m.def("gemm_thread_tile", &gemm_thread_tile, "Thread-tiled FP32 GEMM");
   m.def("gemm_warp_tile", &gemm_warp_tile, "Warp-level FP32 GEMM");
   m.def("rmsnorm_forward", &rmsnorm_forward, "RMSNorm forward");

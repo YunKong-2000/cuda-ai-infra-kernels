@@ -5,7 +5,7 @@ from cuda_ai_kernels import _C
 
 _GEMM_IMPLS = {
     "naive": _C.gemm_naive,
-    "tiled": _C.gemm_tiled,
+    "block_tile": _C.gemm_block_tile,
     "thread_tile": _C.gemm_thread_tile,
     "warp_tile": _C.gemm_warp_tile,
 }

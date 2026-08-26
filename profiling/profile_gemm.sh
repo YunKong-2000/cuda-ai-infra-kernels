@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMPL="${1:-tiled}"
+IMPL="${1:-naive}"
 M="${2:-4096}"
 N="${3:-4096}"
 K="${4:-4096}"
@@ -12,6 +12,7 @@ ncu \
   --set full \
   --import-source yes \
   --source-folders csrc \
+  -f \
   -o "${OUTPUT}" \
   python benchmarks/bench_gemm.py \
     --impl "${IMPL}" \

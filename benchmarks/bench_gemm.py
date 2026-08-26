@@ -9,7 +9,7 @@ from cuda_ai_kernels.env import collect_env
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--impl", choices=["torch", "naive", "tiled", "thread_tile", "warp_tile"], default="naive")
+    parser.add_argument("--impl", choices=["torch", "naive", "block_tile", "thread_tile", "warp_tile"], default="naive")
     parser.add_argument("--m", type=int, default=1024)
     parser.add_argument("--n", type=int, default=1024)
     parser.add_argument("--k", type=int, default=1024)

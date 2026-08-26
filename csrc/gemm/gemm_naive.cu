@@ -1,11 +1,6 @@
-#include <limits>
-
-#include "common/cuda_check.h"
-#include "common/launch_utils.h"
-#include "common/tensor_check.h"
 #include "gemm/gemm.h"
 
-namespace {
+
 
 void check_gemm_inputs(const torch::Tensor& a, const torch::Tensor& b) {
   CHECK_INPUT(a);
@@ -19,6 +14,7 @@ void check_gemm_inputs(const torch::Tensor& a, const torch::Tensor& b) {
   TORCH_CHECK(b.size(1) <= std::numeric_limits<int>::max(), "N is too large for this reference kernel");
 }
 
+namespace {
 __global__ void gemm_naive_kernel(
     const float* __restrict__ a,
     const float* __restrict__ b,
