@@ -156,7 +156,7 @@ torch::Tensor gemm_block_tile(torch::Tensor a, torch::Tensor b) {
   const int k = static_cast<int>(a.size(1));
   const int n = static_cast<int>(b.size(1));
 
-  auto c = torch::empty({m, n}, a.options());
+  auto c = torch::zeros({m, n}, a.options());
   dim3 block(16, 16);
   dim3 grid(ceil_div(n, static_cast<int>(block.x)), ceil_div(m, static_cast<int>(block.y)));
   if (k % VEC == 0 && n % VEC == 0) {
