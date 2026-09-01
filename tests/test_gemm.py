@@ -7,6 +7,21 @@ from cuda_ai_kernels.testing import assert_close
 
 @pytest.mark.cuda
 @pytest.mark.parametrize("shape", [(64, 64, 64), (128, 96, 64), (33, 65, 17)])
+def test_gemm_cublas_matches_torch(shape):
+    m, n, k = shape
+    torch.manual_seed(0)
+    torch.backends.cuda.matmul.allow_tf32 = False
+    a = torch.randn((m, k), device="cuda", dtype=torch.float32)
+    b = torch.randn((k, n), device="cuda", dtype=torch.float32)
+
+    actual = gemm(a, b, impl="cublas")
+    expected = torch.matmul(a, b)
+
+    assert_close(f"gemm_cublas_{shape}", actual, expected, atol=1e-3, rtol=1e-3)
+
+
+@pytest.mark.cuda
+@pytest.mark.parametrize("shape", [(64, 64, 64), (128, 96, 64), (33, 65, 17)])
 def test_gemm_naive_matches_torch(shape):
     m, n, k = shape
     torch.manual_seed(0)

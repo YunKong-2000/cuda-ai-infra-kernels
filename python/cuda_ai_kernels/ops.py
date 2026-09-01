@@ -4,6 +4,7 @@ from cuda_ai_kernels import _C
 
 
 _GEMM_IMPLS = {
+    "cublas": _C.gemm_cublas,
     "naive": _C.gemm_naive,
     "block_tile": _C.gemm_block_tile,
     "thread_tile": _C.gemm_thread_tile,
@@ -31,4 +32,3 @@ def rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
 
 def attention_decode(q: torch.Tensor, k_cache: torch.Tensor, v_cache: torch.Tensor) -> torch.Tensor:
     return _C.attention_decode_forward(q.contiguous(), k_cache.contiguous(), v_cache.contiguous())
-

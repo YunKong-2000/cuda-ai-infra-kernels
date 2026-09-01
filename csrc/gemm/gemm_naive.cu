@@ -7,6 +7,7 @@ void check_gemm_inputs(const torch::Tensor& a, const torch::Tensor& b) {
   CHECK_INPUT(b);
   CHECK_FLOAT32(a);
   CHECK_FLOAT32(b);
+  TORCH_CHECK(a.device() == b.device(), "A and B must be on the same CUDA device");
   TORCH_CHECK(a.dim() == 2 && b.dim() == 2, "gemm expects 2D tensors");
   TORCH_CHECK(a.size(1) == b.size(0), "shape mismatch: A[M,K] @ B[K,N]");
   TORCH_CHECK(a.size(0) <= std::numeric_limits<int>::max(), "M is too large for this reference kernel");

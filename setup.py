@@ -17,6 +17,7 @@ setup(
             sources=[
                 "csrc/bindings.cpp",
                 "csrc/gemm/gemm_naive.cu",
+                "csrc/gemm/gemm_cublas.cu",
                 "csrc/gemm/gemm_block_tile.cu",
                 "csrc/gemm/gemm_thread_tile.cu",
                 "csrc/gemm/gemm_warp_tile.cu",
@@ -26,6 +27,7 @@ setup(
                 "csrc/attention/attention_decode.cu",
             ],
             include_dirs=[str(ROOT / "csrc")],
+            libraries=["cublas"],
             extra_compile_args={
                 "cxx": ["-O3"],
                 "nvcc": ["-O3", "--use_fast_math", "--generate-line-info", "-gencode=arch=compute_80,code=sm_80"],
