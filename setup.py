@@ -28,7 +28,7 @@ setup(
             include_dirs=[str(ROOT / "csrc")],
             extra_compile_args={
                 "cxx": ["-O3"],
-                "nvcc": ["-O3", "--use_fast_math", "--generate-line-info"],
+                "nvcc": ["-O3", "--use_fast_math", "--generate-line-info", "-gencode=arch=compute_80,code=sm_80"],
             },
         )
     ],
