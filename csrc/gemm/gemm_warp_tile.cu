@@ -1,15 +1,15 @@
 #include "common/tensor_check.h"
 #include "gemm/gemm.h"
 
-const int BM = 64;
+const int BM = 128;
 const int BN = 64;
 const int BK = 16;
-const int WM = 16;
+const int WM = 32;
 const int WN = 32;
 const int WX = 2;
 constexpr int WARPS_M = BM / WM;
 constexpr int WARPS_N = BN / WN;
-const int TM = 4;
+const int TM = 8;
 const int TN = 4;
 const int TX = 8;//warp size: 4*8
 const int VEC = 4;
@@ -353,9 +353,13 @@ void prefetch_gemm_tile(
     int N,
     int K)
 {
-  {
-    const int iy = tid / A_VEC_COL;
-    const int ix = (tid % A_VEC_COL) * VEC;
+  constexpr int THREADS = 256;
+  constexpr int A_VEC_COUNT = BM * BK / VEC;
+  constexpr int B_VEC_COUNT = BK * BN / VEC;
+
+  for (int index = tid; index < A_VEC_COUNT; index += THREADS) {
+    const int iy = index / A_VEC_COL;
+    const int ix = (index % A_VEC_COL) * VEC;
 
     const int global_row = block_row + iy;
     const int global_col = k_begin + ix;
@@ -383,9 +387,9 @@ void prefetch_gemm_tile(
         valid ? 16 : 0);
   }
 
-  {
-    const int iy = tid / B_VEC_COL;
-    const int ix = (tid % B_VEC_COL) * VEC;
+  for (int index = tid; index < B_VEC_COUNT; index += THREADS) {
+    const int iy = index / B_VEC_COL;
+    const int ix = (index % B_VEC_COL) * VEC;
 
     const int global_row = k_begin + iy;
     const int global_col = block_col + ix;

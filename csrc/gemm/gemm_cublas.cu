@@ -1,6 +1,6 @@
 #include "gemm/gemm.h"
 
-#include <ATen/cuda/CublasHandlePool.h>
+#include <ATen/cuda/CUDAContext.h>
 #include <cublas_v2.h>
 
 torch::Tensor gemm_cublas(torch::Tensor a, torch::Tensor b) {
