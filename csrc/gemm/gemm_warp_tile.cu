@@ -1,15 +1,15 @@
 #include "common/tensor_check.h"
 #include "gemm/gemm.h"
 
-const int BM = 128;
+const int BM = 64;
 const int BN = 64;
 const int BK = 16;
-const int WM = 32;
+const int WM = 16;
 const int WN = 32;
 const int WX = 2;
 constexpr int WARPS_M = BM / WM;
 constexpr int WARPS_N = BN / WN;
-const int TM = 8;
+const int TM = 4;
 const int TN = 4;
 const int TX = 8;//warp size: 4*8
 const int VEC = 4;
@@ -339,6 +339,27 @@ void cp_async_wait_all()
 #endif
 }
 
+template <int BM_, int BN_, int BK_, int WM_, int WN_, int TM_, int TN_>
+struct GemmConfig {
+  static constexpr int BM = BM_;
+  static constexpr int BN = BN_;
+  static constexpr int BK = BK_;
+  static constexpr int WM = WM_;
+  static constexpr int WN = WN_;
+  static constexpr int TM = TM_;
+  static constexpr int TN = TN_;
+  static constexpr int VEC = 4;
+  static constexpr int WARPS_M = BM / WM;
+  static constexpr int WARPS_N = BN / WN;
+  static constexpr int LANES_M = WM / TM;
+  static constexpr int LANES_N = WN / TN;
+  static constexpr int THREADS = WARPS_M * WARPS_N * 32;
+};
+
+// Change only this alias to benchmark another block/warp/thread layout.
+using ActiveGemmConfig = GemmConfig<128, 64, 16, 32, 32, 8, 4>;
+
+template <typename Config>
 __device__ __forceinline__
 void prefetch_gemm_tile(
     const float* __restrict__ A,
@@ -353,23 +374,24 @@ void prefetch_gemm_tile(
     int N,
     int K)
 {
-  constexpr int THREADS = 256;
-  constexpr int A_VEC_COUNT = BM * BK / VEC;
-  constexpr int B_VEC_COUNT = BK * BN / VEC;
+  constexpr int A_VEC_COL = Config::BK / Config::VEC;
+  constexpr int B_VEC_COL = Config::BN / Config::VEC;
+  constexpr int A_VEC_COUNT = Config::BM * Config::BK / Config::VEC;
+  constexpr int B_VEC_COUNT = Config::BK * Config::BN / Config::VEC;
 
-  for (int index = tid; index < A_VEC_COUNT; index += THREADS) {
+  for (int index = tid; index < A_VEC_COUNT; index += Config::THREADS) {
     const int iy = index / A_VEC_COL;
-    const int ix = (index % A_VEC_COL) * VEC;
+    const int ix = (index % A_VEC_COL) * Config::VEC;
 
     const int global_row = block_row + iy;
     const int global_col = k_begin + ix;
 
     const bool valid =
         global_row < M &&
-        global_col + VEC <= K;
+        global_col + Config::VEC <= K;
 
     const int swizzle_mask =
-        (iy & 3) * VEC;
+        ((iy & 3) * Config::VEC) & (Config::BK - 1);
 
     const int swizzled_ix =
         ix ^ swizzle_mask;
@@ -379,7 +401,7 @@ void prefetch_gemm_tile(
         : A;
 
     float* shared_dst =
-        &A_stage[iy * BK + swizzled_ix];
+        &A_stage[iy * Config::BK + swizzled_ix];
 
     cp_async_16(
         shared_dst,
@@ -387,23 +409,23 @@ void prefetch_gemm_tile(
         valid ? 16 : 0);
   }
 
-  for (int index = tid; index < B_VEC_COUNT; index += THREADS) {
+  for (int index = tid; index < B_VEC_COUNT; index += Config::THREADS) {
     const int iy = index / B_VEC_COL;
-    const int ix = (index % B_VEC_COL) * VEC;
+    const int ix = (index % B_VEC_COL) * Config::VEC;
 
     const int global_row = k_begin + iy;
     const int global_col = block_col + ix;
 
     const bool valid =
         global_row < K &&
-        global_col + VEC <= N;
+        global_col + Config::VEC <= N;
 
     const float* global_src = valid
         ? &B[static_cast<size_t>(global_row) * N + global_col]
         : B;
 
     float* shared_dst =
-        &B_stage[iy * BN + ix];
+        &B_stage[iy * Config::BN + ix];
 
     cp_async_16(
         shared_dst,
@@ -414,7 +436,8 @@ void prefetch_gemm_tile(
   cp_async_commit();
 }
 
-__global__ __launch_bounds__(256)
+template <typename Config>
+__global__
 void gemm_warp_tile_double_buffer_kernel(
     const float* __restrict__ A,
     const float* __restrict__ B,
@@ -423,36 +446,48 @@ void gemm_warp_tile_double_buffer_kernel(
     int N,
     int K)
 {
+  static_assert(Config::BM % Config::WM == 0, "BM must be divisible by WM");
+  static_assert(Config::BN % Config::WN == 0, "BN must be divisible by WN");
+  static_assert(Config::WM % Config::TM == 0, "WM must be divisible by TM");
+  static_assert(Config::WN % Config::TN == 0, "WN must be divisible by TN");
+  static_assert(Config::LANES_M * Config::LANES_N == 32,
+                "one warp must map to exactly 32 thread tiles");
+  static_assert(Config::BK >= Config::VEC && (Config::BK & (Config::BK - 1)) == 0,
+                "BK must be a power of two and at least 4");
+  static_assert(Config::BN % Config::VEC == 0 && Config::TN % Config::VEC == 0,
+                "BN and TN must be multiples of float4");
+  static_assert(Config::THREADS <= 1024, "CUDA blocks support at most 1024 threads");
+
   const int tid = threadIdx.x;
 
   const int warp_id = tid >> 5;
-  const int warp_y = warp_id >> 1;
-  const int warp_x = warp_id & 1;
+  const int warp_y = warp_id / Config::WARPS_N;
+  const int warp_x = warp_id % Config::WARPS_N;
 
   const int lane_id = tid & 31;
-  const int lane_y = lane_id >> 3;
-  const int lane_x = lane_id & 7;
+  const int lane_y = lane_id / Config::LANES_N;
+  const int lane_x = lane_id % Config::LANES_N;
 
-  const int block_row = blockIdx.y * BM;
-  const int block_col = blockIdx.x * BN;
-
-  __shared__ __align__(16)
-      float A_smem[2][BM][BK];
+  const int block_row = blockIdx.y * Config::BM;
+  const int block_col = blockIdx.x * Config::BN;
 
   __shared__ __align__(16)
-      float B_smem[2][BK][BN];
+      float A_smem[2][Config::BM][Config::BK];
 
-  float acc[TM][TN];
+  __shared__ __align__(16)
+      float B_smem[2][Config::BK][Config::BN];
+
+  float acc[Config::TM][Config::TN];
 
   #pragma unroll
-  for (int i = 0; i < TM; ++i) {
+  for (int i = 0; i < Config::TM; ++i) {
     #pragma unroll
-    for (int j = 0; j < TN; ++j) {
+    for (int j = 0; j < Config::TN; ++j) {
       acc[i][j] = 0.0f;
     }
   }
 
-  prefetch_gemm_tile(
+  prefetch_gemm_tile<Config>(
       A,
       B,
       &A_smem[0][0][0],
@@ -469,16 +504,16 @@ void gemm_warp_tile_double_buffer_kernel(
   __syncthreads();
 
   const int warp_row =
-      warp_y * WM;
+      warp_y * Config::WM;
 
   const int thread_col =
-      warp_x * WN + lane_x * TN;
+      warp_x * Config::WN + lane_x * Config::TN;
 
   int current_buffer = 0;
 
-  for (int k_iter = 0; k_iter < K; k_iter += BK) {
+  for (int k_iter = 0; k_iter < K; k_iter += Config::BK) {
     const int next_k =
-        k_iter + BK;
+        k_iter + Config::BK;
 
     const int next_buffer =
         current_buffer ^ 1;
@@ -487,7 +522,7 @@ void gemm_warp_tile_double_buffer_kernel(
         next_k < K;
 
     if (has_next) {
-      prefetch_gemm_tile(
+      prefetch_gemm_tile<Config>(
           A,
           B,
           &A_smem[next_buffer][0][0],
@@ -502,36 +537,36 @@ void gemm_warp_tile_double_buffer_kernel(
     }
 
     #pragma unroll
-    for (int k = 0; k < BK; ++k) {
-      const float4 b =
-          *reinterpret_cast<const float4*>(
-              &B_smem[current_buffer][k][thread_col]);
+    for (int k = 0; k < Config::BK; ++k) {
+      float b[Config::TN];
+      #pragma unroll
+      for (int j = 0; j < Config::TN; j += Config::VEC) {
+        const float4 values = *reinterpret_cast<const float4*>(
+            &B_smem[current_buffer][k][thread_col + j]);
+        b[j] = values.x;
+        b[j + 1] = values.y;
+        b[j + 2] = values.z;
+        b[j + 3] = values.w;
+      }
 
       #pragma unroll
-      for (int i = 0; i < TM; ++i) {
+      for (int i = 0; i < Config::TM; ++i) {
         const int row =
             warp_row +
-            i * (WM / TM) +
+            i * Config::LANES_M +
             lane_y;
 
         // 必须使用与写入阶段相同的swizzle。
         const int swizzled_k =
-            k ^ ((row & 3) * VEC);
+            k ^ (((row & 3) * Config::VEC) & (Config::BK - 1));
 
         const float a =
             A_smem[current_buffer][row][swizzled_k];
 
-        acc[i][0] =
-            fmaf(a, b.x, acc[i][0]);
-
-        acc[i][1] =
-            fmaf(a, b.y, acc[i][1]);
-
-        acc[i][2] =
-            fmaf(a, b.z, acc[i][2]);
-
-        acc[i][3] =
-            fmaf(a, b.w, acc[i][3]);
+        #pragma unroll
+        for (int j = 0; j < Config::TN; ++j) {
+          acc[i][j] = fmaf(a, b[j], acc[i][j]);
+        }
       }
     }
 
@@ -544,52 +579,51 @@ void gemm_warp_tile_double_buffer_kernel(
   }
 
   const int row_base =
-      block_row + warp_y * WM;
+      block_row + warp_y * Config::WM;
 
   const int output_col =
       block_col +
-      warp_x * WN +
-      lane_x * TN;
+      warp_x * Config::WN +
+      lane_x * Config::TN;
 
   if (output_col < N) {
     #pragma unroll
-    for (int i = 0; i < TM; ++i) {
+    for (int i = 0; i < Config::TM; ++i) {
       const int output_row =
           row_base +
-          i * (WM / TM) +
+          i * Config::LANES_M +
           lane_y;
 
       if (output_row >= M) {
         break;
       }
 
-      const float4 result = make_float4(
-          acc[i][0],
-          acc[i][1],
-          acc[i][2],
-          acc[i][3]);
-
-      *reinterpret_cast<float4*>(
-          &C[
-              static_cast<size_t>(output_row) * N +
-              output_col]) = result;
+      #pragma unroll
+      for (int j = 0; j < Config::TN; j += Config::VEC) {
+        const float4 result = make_float4(
+            acc[i][j], acc[i][j + 1], acc[i][j + 2], acc[i][j + 3]);
+        *reinterpret_cast<float4*>(
+            &C[static_cast<size_t>(output_row) * N + output_col + j]) = result;
+      }
     }
   }
 }
 
 torch::Tensor gemm_warp_tile(torch::Tensor a, torch::Tensor b) {
-    check_gemm_inputs(a, b);
+  check_gemm_inputs(a, b);
   const int m = static_cast<int>(a.size(0));
   const int k = static_cast<int>(a.size(1));
   const int n = static_cast<int>(b.size(1));
 
   torch::Tensor c = torch::zeros({m, n}, a.options());
-  dim3 block(256);
+  using Config = ActiveGemmConfig;
+  dim3 block(Config::THREADS);
   dim3 grid(
-    ceil_div(n, BN),
-    ceil_div(m, BM));
-  if (n % VEC == 0 && k % VEC == 0) {
-    gemm_warp_tile_double_buffer_kernel<<<grid, block>>>(a.data_ptr<float>(), b.data_ptr<float>(), c.data_ptr<float>(), m, n, k);
+    ceil_div(n, Config::BN),
+    ceil_div(m, Config::BM));
+  if (n % Config::TN == 0 && k % Config::VEC == 0) {
+    gemm_warp_tile_double_buffer_kernel<Config><<<grid, block>>>(
+        a.data_ptr<float>(), b.data_ptr<float>(), c.data_ptr<float>(), m, n, k);
   }
   else {
   }
