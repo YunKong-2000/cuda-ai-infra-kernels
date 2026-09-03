@@ -9,7 +9,7 @@ from cuda_ai_kernels.env import collect_env
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--impl", choices=["torch", "cuda"], default="cuda")
+    parser.add_argument("--impl", choices=["torch","naive", "cache_x"], default="naive")
     parser.add_argument("--rows", type=int, default=4096)
     parser.add_argument("--hidden", type=int, default=4096)
     parser.add_argument("--eps", type=float, default=1e-6)
@@ -27,7 +27,7 @@ def main() -> None:
         if args.impl == "torch":
             inv_rms = torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + args.eps)
             return x * inv_rms * weight
-        return rmsnorm(x, weight, args.eps)
+        return rmsnorm(x, weight, args.eps, args.impl)
 
     stats = cuda_event_benchmark(run, warmup=args.warmup, repeat=args.repeat)
     bytes_moved = args.rows * args.hidden * 3 * 4 + args.hidden * 4

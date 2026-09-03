@@ -11,6 +11,11 @@ _GEMM_IMPLS = {
     "warp_tile": _C.gemm_warp_tile,
 }
 
+_RMSNORM_IMPLS = {
+    "naive": _C.rmsnorm_naive,
+    "cache_x": _C.rmsnorm_cache_x
+}
+
 
 def gemm(a: torch.Tensor, b: torch.Tensor, impl: str = "naive") -> torch.Tensor:
     if impl not in _GEMM_IMPLS:
@@ -18,8 +23,10 @@ def gemm(a: torch.Tensor, b: torch.Tensor, impl: str = "naive") -> torch.Tensor:
     return _GEMM_IMPLS[impl](a.contiguous(), b.contiguous())
 
 
-def rmsnorm(x: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
-    return _C.rmsnorm_forward(x.contiguous(), weight.contiguous(), eps)
+def rmsnorm(x: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6, impl: str = "naive") -> torch.Tensor:
+    if impl not in _RMSNORM_IMPLS:
+        raise ValueError(f"unknown RMSNorm impl: {impl}")
+    return _RMSNORM_IMPLS[impl](x.contiguous(), weight.contiguous(), eps)
 
 
 def softmax(x: torch.Tensor) -> torch.Tensor:
