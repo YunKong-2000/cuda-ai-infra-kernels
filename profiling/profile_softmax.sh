@@ -4,10 +4,15 @@ set -euo pipefail
 IMPL="${1:-cuda}"
 ROWS="${2:-4096}"
 COLS="${3:-2048}"
+OUTPUT="${4:-softmax.ncu-rep}"
 
 ncu \
   --target-processes all \
-  --metrics-file profiling/ncu_metrics.txt \
+  --set full \
+  --import-source yes \
+  --source-folders csrc \
+  -f \
+  -o "${OUTPUT}" \
   python benchmarks/bench_softmax.py \
     --impl "${IMPL}" \
     --rows "${ROWS}" \

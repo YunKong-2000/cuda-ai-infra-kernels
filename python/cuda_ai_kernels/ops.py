@@ -16,6 +16,10 @@ _RMSNORM_IMPLS = {
     "cache_x": _C.rmsnorm_cache_x
 }
 
+_SOFTMAX_IMPLS = {
+    "naive": _C.softmax_naive
+}
+
 
 def gemm(a: torch.Tensor, b: torch.Tensor, impl: str = "naive") -> torch.Tensor:
     if impl not in _GEMM_IMPLS:
@@ -29,8 +33,10 @@ def rmsnorm(x: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6, impl: str 
     return _RMSNORM_IMPLS[impl](x.contiguous(), weight.contiguous(), eps)
 
 
-def softmax(x: torch.Tensor) -> torch.Tensor:
-    return _C.softmax_forward(x.contiguous())
+def softmax(x: torch.Tensor, impl: str = "naive") -> torch.Tensor:
+    if impl not in _SOFTMAX_IMPLS:
+        raise ValueError(f"unknown softmax impl: {impl}")
+    return _SOFTMAX_IMPLS[impl](x.contiguous())
 
 
 def rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:

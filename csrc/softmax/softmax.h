@@ -2,5 +2,5 @@
 
 #include <torch/extension.h>
 
-torch::Tensor softmax_forward(torch::Tensor x);
+torch::Tensor softmax_naive(torch::Tensor x);
 
