@@ -21,6 +21,7 @@ setup(
                 "csrc/gemm/gemm_block_tile.cu",
                 "csrc/gemm/gemm_thread_tile.cu",
                 "csrc/gemm/gemm_warp_tile.cu",
+                "csrc/gemm/gemm_tensor_core.cu",
                 "csrc/rmsnorm/rmsnorm_naive.cu",
                 "csrc/rmsnorm/rmsnorm_cache_x.cu",
                 "csrc/softmax/softmax.cu",
