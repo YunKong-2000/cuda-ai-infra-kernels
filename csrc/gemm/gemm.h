@@ -8,6 +8,7 @@
 
 torch::Tensor gemm_naive(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_cublas(torch::Tensor a, torch::Tensor b);
+torch::Tensor gemm_cutlass(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_block_tile(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_thread_tile(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_warp_tile(torch::Tensor a, torch::Tensor b);

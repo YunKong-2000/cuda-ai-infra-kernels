@@ -9,7 +9,8 @@ _GEMM_IMPLS = {
     "block_tile": _C.gemm_block_tile,
     "thread_tile": _C.gemm_thread_tile,
     "warp_tile": _C.gemm_warp_tile,
-    "tensor_core": _C.gemm_tensor_core
+    "tensor_core": _C.gemm_tensor_core,
+    "cutlass": _C.gemm_cutlass
 }
 
 _RMSNORM_IMPLS = {

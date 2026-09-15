@@ -90,6 +90,20 @@ def test_gemm_tensor_core_matches_torch(shape):
 
     assert_close(f"gemm_tensor_core_{shape}", actual, expected, atol=3e-2, rtol=3e-2)
 
+@pytest.mark.cuda
+@pytest.mark.parametrize("shape", [(64, 64, 64), (128, 96, 64), (33, 65, 17)])
+def test_gemm_cutlass_matches_torch(shape):
+    m, n, k = shape
+    torch.manual_seed(0)
+    torch.backends.cuda.matmul.allow_tf32 = False  # Disable TF32 for exact comparison
+    a = torch.randn((m, k), device="cuda", dtype=torch.float32)
+    b = torch.randn((k, n), device="cuda", dtype=torch.float32)
+
+    actual = gemm(a, b, impl="cutlass")
+    expected = torch.matmul(a, b)
+
+    assert_close(f"gemm_cutlass_{shape}", actual, expected, atol=1e-3, rtol=1e-3)
+
 
 def test_gemm_optimized_placeholders(impl):
     pass

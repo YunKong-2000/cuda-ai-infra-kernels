@@ -13,6 +13,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gemm_thread_tile", &gemm_thread_tile, "Thread-tiled FP32 GEMM");
   m.def("gemm_warp_tile", &gemm_warp_tile, "Warp-level FP32 GEMM");
   m.def("gemm_tensor_core", &gemm_tensor_core, "TF32 GEMM using Warp-level Tensor Core");
+  m.def("gemm_cutlass", &gemm_cutlass, "cutlass gemm");
   m.def("rmsnorm_naive", &rmsnorm_naive, "naive RMSNorm forward");
   m.def("rmsnorm_cache_x", &rmsnorm_cache_x, "cache-x RMSNorm forward");
   m.def("softmax_naive", &softmax_naive, "naive Softmax forward");
