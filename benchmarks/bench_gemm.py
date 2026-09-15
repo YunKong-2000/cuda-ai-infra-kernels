@@ -11,7 +11,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--impl",
-        choices=["torch", "cublas", "naive", "block_tile", "thread_tile", "warp_tile"],
+        choices=["torch", "cublas", "naive", "block_tile", "thread_tile", "warp_tile", "tensor_core"],
         default="naive",
     )
     parser.add_argument("--m", type=int, default=1024)
