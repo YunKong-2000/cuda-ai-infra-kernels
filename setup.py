@@ -5,6 +5,8 @@ from torch.utils.cpp_extension import BuildExtension, CUDAExtension
 
 
 ROOT = Path(__file__).parent.resolve()
+CUTLASS_ROOT = ROOT / "third_party" / "cutlass"
+
 
 
 setup(
@@ -28,7 +30,10 @@ setup(
                 "csrc/rope/rope.cu",
                 "csrc/attention/attention_decode.cu",
             ],
-            include_dirs=[str(ROOT / "csrc")],
+            include_dirs=[
+                str(ROOT / "csrc"),
+                str(CUTLASS_ROOT / "include"),
+            ],
             libraries=["cublas"],
             extra_compile_args={
                 "cxx": ["-O3"],
