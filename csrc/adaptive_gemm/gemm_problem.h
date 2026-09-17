@@ -1,66 +1,57 @@
 #pragma once
-#include "adaptive_gemm.h"
-#include <ATen/core/ScalarType.h>
 
-enum class EpilogueKind{
-  ReLu,
-  GeLu,
+#include <cuda_runtime_api.h>
+#include <torch/extension.h>
+
+enum class EpilogueKind {
+  Relu,
+  Gelu,
   Bias,
   Linear,
   BiasRelu,
   BiasGelu,
   Residual,
   BiasResidualGelu,
-}
+};
 
-struct EpilogueDesc{
-  EpilogueKind kind;
-  float alpha;
-  float beta;
-  const void* bias;
-  const void* residual;
-}
+struct EpilogueDesc {
+  EpilogueKind kind{EpilogueKind::Linear};
+  float alpha{1.0f};
+  float beta{0.0f};
+  const void* bias{nullptr};
+  const void* residual{nullptr};
+};
 
-struct GemmProblem{
-  int M;
-  int N;
-  int K;
+struct GemmProblem {
+  int M{0};
+  int N{0};
+  int K{0};
 
-  const void* a;
-  const void* b;
-  bool has_c;
-  const void* c;
-  bool has_bias;
-  const void* bias;
-  void* d;
+  const void* a{nullptr};
+  const void* b{nullptr};
+  bool has_c{false};
+  const void* c{nullptr};
+  bool has_bias{false};
+  const void* bias{nullptr};
+  void* d{nullptr};
 
-  int64_t lda;
-  int64_t ldb;
-  int64_t ldc;
-  int64_t ldd;
+  int64_t lda{0};
+  int64_t ldb{0};
+  int64_t ldc{0};
+  int64_t ldd{0};
 
-  at::ScalarType dtype_a;
-  at::ScalarType dtype_b;
-  at::ScalarType dtype_c;
-  at::ScalarType dtype_d;
+  at::ScalarType dtype_a{at::ScalarType::Undefined};
+  at::ScalarType dtype_b{at::ScalarType::Undefined};
+  at::ScalarType dtype_c{at::ScalarType::Undefined};
+  at::ScalarType dtype_d{at::ScalarType::Undefined};
+  at::ScalarType dtype_bias{at::ScalarType::Undefined};
+
 
   EpilogueDesc epilogue;
-  cudaStream_t stream;
-  GemmProblem(torch::Tensor a, torch::Tensor a);
-}
-
-GemmProblem(torch::Tensor a, torch::Tensor b, torch::Tensor d, cudaStream_t cur_stream) {
-  this->M = a.size(0);
-  this->N = b.size(1);
-  this->K = a.size(1);
-  this->dtype_a = a.dtype;
-  this->dtype_b = b.dtype;
-  this->dtype_d = d.dtype;
-  this->a = a.data_ptr<a.dtype>();
-  this->b = b.data_ptr<b.dtype>();
-  this->d = d.data_ptr<d.dtype>();
-  this->lda = a.size(1);
-  this->ldb = b.size(1);
-  this->ldd = d.size(1);
-  this->stream = cur_stream;
-}
+  cudaStream_t stream{nullptr};
+  GemmProblem(
+    const torch::Tensor& a,
+    const torch::Tensor& b,
+    torch::Tensor& d,
+    cudaStream_t current_stream);
+};

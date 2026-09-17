@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 
 from cuda_ai_kernels import _C
@@ -47,3 +49,25 @@ def rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
 
 def attention_decode(q: torch.Tensor, k_cache: torch.Tensor, v_cache: torch.Tensor) -> torch.Tensor:
     return _C.attention_decode_forward(q.contiguous(), k_cache.contiguous(), v_cache.contiguous())
+
+
+def adaptive_gemm(
+    a: torch.Tensor,
+    b: torch.Tensor,
+    c: Optional[torch.Tensor] = None,
+    bias: Optional[torch.Tensor] = None,
+    alpha: float = 1.0,
+    beta: float = 0.0,
+    epilogue: str = "linear",
+) -> torch.Tensor:
+    c_arg = c.contiguous() if c is not None else None
+    bias_arg = bias.contiguous() if bias is not None else None
+    return _C.adaptive_gemm(
+        a.contiguous(),
+        b.contiguous(),
+        c_arg,
+        bias_arg,
+        alpha,
+        beta,
+        epilogue,
+    )

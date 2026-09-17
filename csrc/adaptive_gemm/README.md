@@ -1,7 +1,7 @@
 # A100 Shape-Adaptive Fused GEMM 学习项目
 
-这个目录只保存项目设计和任务拆分。CUDA kernel、binding、测试和 benchmark
-都需要你自己编写。
+这个目录包含项目设计、FP32 LinearCombination baseline、kernel registry 和运行时
+dispatcher。bias、activation、更多 tile/dtype、专项 benchmark 和 profiling 仍待完成。
 
 ## 1. 项目目标
 
@@ -25,8 +25,9 @@
 csrc/adaptive_gemm/
   adaptive_gemm.h          对外 C++ 接口和参数定义
   kernel_config.h          kernel ID、tile、stage、alignment 元数据
-  kernels_sm80.cu          CUTLASS kernel 类型和类型到 launcher 的封装
-  dispatch.cpp             运行时选择逻辑，不包含 CUDA kernel 实现
+  kernel_sm80.h            CUTLASS kernel 类型
+  kernel_launcher.h        类型擦除 launcher 和 metadata 构造
+  kernel_dispatch.cu       kernel registry 和运行时选择逻辑
   epilogue_ops.cuh         自定义 activation 或 epilogue functor
   reduction.cu             partial/final reduction，最后阶段再增加
   README.md                本设计书和实验结论

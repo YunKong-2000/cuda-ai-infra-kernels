@@ -1,54 +1,45 @@
+#pragma once
 #include "kernel_config.h"
 
-using cutlassSgemmLargeFast = cutlass::gemm::device::Gemm<ElementA,
+using Fast128x128Stage4FP32 = cutlass::gemm::device::Gemm<ElementA,
                                                  LayoutA,
                                                  ElementB,
                                                  LayoutB,
                                                  ElementC,
                                                  LayoutC,
                                                  ElementAccumulator,
-                                                 Opclass,
+                                                 OpClass,
                                                  ArchTag,
                                                  LargeThreadBlockShape,
                                                  LargeWarpShape,
-                                                 LargeMutiplyAddShape,
+                                                 LargeMultiplyAddShape,
                                                  FastFP32EpilogueOp,
                                                  Swizzle,
-                                                 kstages_num,
+                                                 kStages,
                                                  kAlignmentA,
                                                  kAlignmentB,
                                                  false,
                                                  OpMMA
-                                                 >
+                                                 >;
 
 
-using cutlassSgemmLargeFallback = cutlass::gemm::device::Gemm<ElementA,
+using Fallback128x128Stage4FP32 = cutlass::gemm::device::Gemm<ElementA,
                                                  LayoutA,
                                                  ElementB,
                                                  LayoutB,
                                                  ElementC,
                                                  LayoutC,
                                                  ElementAccumulator,
-                                                 Opclass,
+                                                 OpClass,
                                                  ArchTag,
                                                  LargeThreadBlockShape,
                                                  LargeWarpShape,
-                                                 LargeMutiplyAddShape,
+                                                 LargeMultiplyAddShape,
                                                  FallbackFP32EpilogueOp,
                                                  Swizzle,
-                                                 kstages_num,
+                                                 kStages,
                                                  1,
                                                  1,
                                                  false,
                                                  OpMMA
-                                                 >
-                
-enum class KernelId {
-  Balanced128x128Stage3,
-  Balanced128x128Stage4,
-  SmallM64x128,
-  SmallN128x64,
-  ScalarFallback,
-  SplitK,
-};
-                                                 
+                                                 >;

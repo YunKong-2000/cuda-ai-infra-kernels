@@ -1,10 +1,17 @@
 __all__ = [
+    "adaptive_gemm",
     "attention_decode",
     "gemm",
     "rmsnorm",
     "rope",
     "softmax",
 ]
+
+
+def adaptive_gemm(*args, **kwargs):
+    from .ops import adaptive_gemm as op
+
+    return op(*args, **kwargs)
 
 
 def gemm(*args, **kwargs):
@@ -35,4 +42,3 @@ def attention_decode(*args, **kwargs):
     from .ops import attention_decode as op
 
     return op(*args, **kwargs)
-

@@ -1,14 +1,5 @@
-#include "cutlass\gemm\device\gemm.h"
-#include "gemm.h"
-
-enum class KernelId {
-  Balanced128x128Stage3,
-  Balanced128x128Stage4,
-  SmallM64x128,
-  SmallN128x64,
-  ScalarFallback,
-  SplitK,
-};
+#pragma once
+#include "cutlass/gemm/device/gemm.h"
 
 using ElementAccumulator = float;
 using ElementEpilogue = float;
@@ -34,23 +25,15 @@ using LargeWarpShape = cutlass::gemm::GemmShape<64, 64, 16>;
 using MediumWarpShape = cutlass::gemm::GemmShape<64, 32, 16>;
 using SmallWarpShape = cutlass::gemm::GemmShape<32, 32, 16>;
 
-using LargeMutiplyAddShape = cutlass::gemm::GemmShape<16, 8, 8>;
-using SmallMutiplyAddShape = cutlass::gemm::GemmShape<16, 8, 4>;
+using LargeMultiplyAddShape = cutlass::gemm::GemmShape<16, 8, 8>;
+using SmallMultiplyAddShape = cutlass::gemm::GemmShape<16, 8, 4>;
 
-const int kAlignmentA = 128 / sizeof_bits<ElementA>::value;
-const int kAlignmentB = 128 / sizeof_bits<ElementB>::value;
+inline constexpr int kAlignmentA = 128 / cutlass::sizeof_bits<ElementA>::value;
+inline constexpr int kAlignmentB = 128 / cutlass::sizeof_bits<ElementB>::value;
 
-using FastFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<ElementC, kAlignmentA, ElementAccumilator, ElementAccumilator>;
-using FallbackFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<ElementC, 1, ElementAccumilator, ElementAccumilator>;
+using FastFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<ElementC, 4, ElementAccumulator, ElementEpilogue>;
+using FallbackFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<ElementC, 1, ElementAccumulator, ElementEpilogue>;
 
 using Swizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>;
 
-const int kstages_num = 4;
-
-
-
-
-
-
-
-
+inline constexpr int kStages = 4;

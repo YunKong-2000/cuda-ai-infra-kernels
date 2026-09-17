@@ -1,5 +1,6 @@
 #include <torch/extension.h>
 
+#include "adaptive_gemm/adaptive_gemm.h"
 #include "attention/attention_decode.h"
 #include "gemm/gemm.h"
 #include "rmsnorm/rmsnorm.h"
@@ -19,4 +20,5 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("softmax_naive", &softmax_naive, "naive Softmax forward");
   m.def("rope_forward", &rope_forward, "RoPE forward");
   m.def("attention_decode_forward", &attention_decode_forward, "Attention decode forward");
+  m.def("adaptive_gemm", &adaptive_gemm, "Shape-adaptive CUTLASS GEMM");
 }

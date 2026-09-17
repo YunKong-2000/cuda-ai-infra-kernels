@@ -30,6 +30,9 @@ setup(
                 "csrc/softmax/softmax.cu",
                 "csrc/rope/rope.cu",
                 "csrc/attention/attention_decode.cu",
+                "csrc/adaptive_gemm/adaptive_gemm.cu",
+                "csrc/adaptive_gemm/gemm_problem.cpp",
+                "csrc/adaptive_gemm/kernel_dispatch.cu",
             ],
             include_dirs=[
                 str(ROOT / "csrc"),
