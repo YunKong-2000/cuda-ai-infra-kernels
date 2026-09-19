@@ -250,6 +250,7 @@ python benchmarks/bench_adaptive_gemm.py \
 dispatch。单独测量时可传 `--kernel fast` 或 `--kernel fallback`。`fast` 要求 `N` 和
 `K` 都是 4 的倍数；benchmark 会在运行前检查这个条件。结果默认保存到
 `results/raw/`，使用 `--no-save` 可只打印结果。
+
 - 避免把 tensor allocation 和 autotuning 混入 kernel latency；必要时提供 out variant。
 - 报告 TFLOPS、峰值比例，以及 fused workload 的端到端 latency。
 - 不只报告最有利的 shape，同时保留失败或退化结果。
@@ -262,6 +263,16 @@ Nsight Compute 至少关注：
 - registers/thread 和 occupancy。
 - shared-memory bank conflict。
 - eligible/active warps 和主要 stall reason。
+
+使用 Nsight Compute 收集完整指标并生成 `.ncu-rep` 报告：
+
+```bash
+bash profiling/profile_adaptive_gemm.sh \
+  fast 4096 4096 4096 profiling/adaptive_gemm_fast_4096.ncu-rep
+```
+
+脚本只 profile `adaptive_gemm_profile` NVTX 范围内的一次目标 kernel，warmup 和输入
+初始化不会出现在报告里。第一个参数也可以使用 `fallback` 或 `auto`。
 
 ## 12. 建议阅读顺序
 

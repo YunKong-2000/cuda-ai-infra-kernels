@@ -80,6 +80,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--save", type=str, default="")
     parser.add_argument("--no-save", action="store_true")
+    parser.add_argument(
+        "--profile",
+        action="store_true",
+        help="Warm up, then run one kernel inside the adaptive_gemm_profile NVTX range.",
+    )
     args = parser.parse_args()
 
     if min(args.m, args.n, args.k) <= 0:
@@ -88,6 +93,8 @@ def main() -> None:
         parser.error("--warmup must be non-negative and --repeat must be positive")
     if args.kernel in {"fast", "all"} and (args.k % 4 != 0 or args.n % 4 != 0):
         parser.error("the fast kernel requires both K and N to be divisible by 4")
+    if args.profile and args.kernel == "all":
+        parser.error("--profile requires one kernel, not --kernel all")
     if not torch.cuda.is_available():
         parser.error("CUDA is required")
 
@@ -95,6 +102,21 @@ def main() -> None:
     torch.backends.cuda.matmul.allow_tf32 = True
     a = torch.randn((args.m, args.k), device="cuda", dtype=torch.float32)
     b = torch.randn((args.k, args.n), device="cuda", dtype=torch.float32)
+
+    if args.profile:
+        run = make_runner(args.kernel, a, b)
+        for _ in range(args.warmup):
+            run()
+        torch.cuda.synchronize()
+
+        torch.cuda.nvtx.range_push("adaptive_gemm_profile")
+        try:
+            run()
+        finally:
+            torch.cuda.nvtx.range_pop()
+        torch.cuda.synchronize()
+        return
+
     expected = torch.matmul(a, b)
     torch.cuda.synchronize()
 

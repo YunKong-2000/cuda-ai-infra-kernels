@@ -103,6 +103,7 @@ python benchmarks/run_all.py --kernel softmax --impl cuda
 
 ```bash
 bash profiling/profile_gemm.sh tiled 4096 4096 4096
+bash profiling/profile_adaptive_gemm.sh fast 4096 4096 4096
 bash profiling/profile_rmsnorm.sh cuda 4096 4096
 bash profiling/profile_softmax.sh cuda 4096 2048
 ```
