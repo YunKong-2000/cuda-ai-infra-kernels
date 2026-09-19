@@ -57,6 +57,22 @@ EpilogueKind parse_epilogue(const std::string& value) {
   TORCH_CHECK(false, "unsupported epilogue: ", value);
 }
 
+KernelId parse_kernel(const std::string& value) {
+  if (value == "auto") {
+    return KernelId::Auto;
+  }
+  if (value == "fast") {
+    return KernelId::Fast128x128Stage4FP32;
+  }
+  if (value == "fallback") {
+    return KernelId::Fallback128x128Stage4FP32;
+  }
+  TORCH_CHECK(
+    false,
+    "unsupported adaptive_gemm kernel: ", value,
+    "; expected one of: auto, fast, fallback");
+}
+
 void check_c(const torch::Tensor& c, const torch::Tensor& a, int64_t m, int64_t n) {
   CHECK_INPUT(c);
   CHECK_FLOAT32(c);
@@ -76,10 +92,12 @@ torch::Tensor adaptive_gemm(
   const c10::optional<at::Tensor>& bias,
   double alpha,
   double beta,
-  const std::string& epilogue) {
+  const std::string& epilogue,
+  const std::string& kernel) {
   check_input(a, b);
 
   const EpilogueKind epilogue_kind = parse_epilogue(epilogue);
+  const KernelId requested_kernel = parse_kernel(kernel);
   TORCH_CHECK(
     epilogue_kind == EpilogueKind::Linear,
     "adaptive_gemm currently supports only the linear epilogue");
@@ -96,7 +114,7 @@ torch::Tensor adaptive_gemm(
   }
 
   c10::cuda::CUDAGuard device_guard(a.device());
-  auto d = torch::zeros({m, n}, a.options());
+  auto d = torch::empty({m, n}, a.options());
 
   const cudaStream_t current_stream =
     c10::cuda::getCurrentCUDAStream(a.get_device()).stream();
@@ -116,7 +134,7 @@ torch::Tensor adaptive_gemm(
   problem.epilogue.alpha = static_cast<float>(alpha);
   problem.epilogue.beta = static_cast<float>(beta);
 
-  const cutlass::Status status = dispatch_gemm(problem);
+  const cutlass::Status status = dispatch_gemm(problem, requested_kernel);
   TORCH_CHECK(
     status == cutlass::Status::kSuccess,
     "adaptive GEMM dispatch failed: ", cutlassGetStatusString(status));

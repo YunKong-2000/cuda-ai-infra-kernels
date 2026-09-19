@@ -5,6 +5,7 @@
 #include "gemm_problem.h"
 
 enum class KernelId {
+  Auto,
   Fast128x128Stage4FP32,
   Fallback128x128Stage4FP32,
 };

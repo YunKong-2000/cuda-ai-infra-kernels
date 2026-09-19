@@ -238,6 +238,18 @@ workspace、额外 reduction、atomic 开销之间的平衡。
 - 与 PyTorch、cuBLAS 和 `cutlass_profiler` 对比。
 - 记录 GPU、driver、CUDA、PyTorch、CUTLASS commit 和 clock 状态。
 - warmup 后使用 CUDA Event 测量，报告 mean、median 和 minimum。
+
+现有 FP32 kernel 可以在相同 shape 下分别强制运行：
+
+```bash
+python benchmarks/bench_adaptive_gemm.py \
+  --kernel all --m 1024 --n 1024 --k 1024
+```
+
+`all` 会依次测量 PyTorch、向量化 `fast` kernel、标量 `fallback` kernel 和自动
+dispatch。单独测量时可传 `--kernel fast` 或 `--kernel fallback`。`fast` 要求 `N` 和
+`K` 都是 4 的倍数；benchmark 会在运行前检查这个条件。结果默认保存到
+`results/raw/`，使用 `--no-save` 可只打印结果。
 - 避免把 tensor allocation 和 autotuning 混入 kernel latency；必要时提供 out variant。
 - 报告 TFLOPS、峰值比例，以及 fused workload 的端到端 latency。
 - 不只报告最有利的 shape，同时保留失败或退化结果。

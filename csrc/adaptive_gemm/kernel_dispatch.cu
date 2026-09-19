@@ -62,8 +62,14 @@ const std::array<KernelEntry, 2> kKernelRegistry{{
 
 }  // namespace
 
-cutlass::Status dispatch_gemm(const GemmProblem& problem) {
+cutlass::Status dispatch_gemm(
+  const GemmProblem& problem,
+  KernelId requested_kernel) {
   for (const auto& entry : kKernelRegistry) {
+    if (requested_kernel != KernelId::Auto && entry.id != requested_kernel) {
+      continue;
+    }
+
     if (entry.epilogue_kind != problem.epilogue.kind) {
       continue;
     }

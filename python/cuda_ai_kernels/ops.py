@@ -59,6 +59,7 @@ def adaptive_gemm(
     alpha: float = 1.0,
     beta: float = 0.0,
     epilogue: str = "linear",
+    kernel: str = "auto",
 ) -> torch.Tensor:
     c_arg = c.contiguous() if c is not None else None
     bias_arg = bias.contiguous() if bias is not None else None
@@ -70,4 +71,5 @@ def adaptive_gemm(
         alpha,
         beta,
         epilogue,
+        kernel,
     )

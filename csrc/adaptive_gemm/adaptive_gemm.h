@@ -12,4 +12,5 @@ torch::Tensor adaptive_gemm(
   const c10::optional<at::Tensor>& bias,
   double alpha,
   double beta,
-  const std::string& epilogue);
+  const std::string& epilogue,
+  const std::string& kernel);

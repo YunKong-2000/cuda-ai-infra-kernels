@@ -50,6 +50,36 @@ def test_adaptive_gemm_alpha_beta_matches_torch():
 
 
 @pytest.mark.cuda
+@pytest.mark.parametrize("kernel", ["fast", "fallback"])
+def test_adaptive_gemm_forced_kernel_matches_torch(kernel):
+    m, n, k = 128, 128, 64
+    torch.manual_seed(0)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    a = torch.randn((m, k), device="cuda", dtype=torch.float32)
+    b = torch.randn((k, n), device="cuda", dtype=torch.float32)
+
+    actual = adaptive_gemm(a, b, kernel=kernel)
+    expected = torch.matmul(a, b)
+
+    assert_close(
+        f"adaptive_gemm_forced_{kernel}",
+        actual,
+        expected,
+        atol=3e-2,
+        rtol=3e-2,
+    )
+
+
+@pytest.mark.cuda
+def test_adaptive_gemm_rejects_unknown_kernel():
+    a = torch.randn((16, 16), device="cuda", dtype=torch.float32)
+    b = torch.randn((16, 16), device="cuda", dtype=torch.float32)
+
+    with pytest.raises(RuntimeError, match="unsupported adaptive_gemm kernel"):
+        adaptive_gemm(a, b, kernel="unknown")
+
+
+@pytest.mark.cuda
 def test_adaptive_gemm_rejects_unsupported_dtype():
     a = torch.randn((16, 16), device="cuda", dtype=torch.float16)
     b = torch.randn((16, 16), device="cuda", dtype=torch.float16)

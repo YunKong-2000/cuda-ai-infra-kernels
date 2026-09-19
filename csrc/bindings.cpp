@@ -20,5 +20,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("softmax_naive", &softmax_naive, "naive Softmax forward");
   m.def("rope_forward", &rope_forward, "RoPE forward");
   m.def("attention_decode_forward", &attention_decode_forward, "Attention decode forward");
-  m.def("adaptive_gemm", &adaptive_gemm, "Shape-adaptive CUTLASS GEMM");
+  m.def(
+    "adaptive_gemm",
+    &adaptive_gemm,
+    "Shape-adaptive CUTLASS GEMM",
+    py::arg("a"),
+    py::arg("b"),
+    py::arg("c") = py::none(),
+    py::arg("bias") = py::none(),
+    py::arg("alpha") = 1.0,
+    py::arg("beta") = 0.0,
+    py::arg("epilogue") = "linear",
+    py::arg("kernel") = "auto");
 }
