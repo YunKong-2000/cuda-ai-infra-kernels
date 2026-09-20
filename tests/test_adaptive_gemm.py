@@ -50,7 +50,17 @@ def test_adaptive_gemm_alpha_beta_matches_torch():
 
 
 @pytest.mark.cuda
-@pytest.mark.parametrize("kernel", ["fast", "fallback", "fast_mwarp", "fallback_mwarp"])
+@pytest.mark.parametrize(
+    "kernel",
+    [
+        "fast",
+        "fallback",
+        "fast_mwarp",
+        "fallback_mwarp",
+        "fast_stage3",
+        "fast_stage2",
+    ],
+)
 @pytest.mark.parametrize("shape", [(128, 128, 64), (33, 68, 20)])
 def test_adaptive_gemm_forced_kernel_matches_torch(kernel, shape):
     m, n, k = shape
@@ -72,7 +82,7 @@ def test_adaptive_gemm_forced_kernel_matches_torch(kernel, shape):
 
 
 @pytest.mark.cuda
-@pytest.mark.parametrize("kernel", ["fast", "fast_mwarp"])
+@pytest.mark.parametrize("kernel", ["fast", "fast_mwarp", "fast_stage3", "fast_stage2"])
 @pytest.mark.parametrize("shape", [(33, 65, 20), (33, 68, 17)])
 def test_adaptive_gemm_forced_kernel_rejects_misaligned_shape(kernel, shape):
     m, n, k = shape

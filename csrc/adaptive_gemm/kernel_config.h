@@ -37,3 +37,5 @@ using FallbackFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<Elem
 using Swizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>;
 
 inline constexpr int kStages = 4;
+inline constexpr int k2Stages = 2;
+inline constexpr int k3Stages = 3;
