@@ -253,13 +253,14 @@ python benchmarks/bench_adaptive_gemm.py \
 | `fast` | 64×64×16 | 4 | 4 |
 | `fallback` | 64×64×16 | 1 | 1 |
 | `fast_mwarp` | 64×32×16 | 4 | 4 |
-| `fallback_mwarp` | 64×32×16 | 4 | 1 |
+| `fallback_mwarp` | 64×32×16 | 1 | 1 |
 
 四个 kernel 的 threadblock tile 都是 128×128×16，pipeline 都是 4 stages。
 较小 warp tile 对应每个 CTA 从 4 个 warp 增加到 8 个 warp。
-`fallback_mwarp` 当前仍使用向量化 A/B 访问，因此与 `fast`、`fast_mwarp` 一样要求
-连续输入的 `N` 和 `K` 都是 4 的倍数；benchmark 会在运行前检查这个条件。
-它与旧 `fallback` 的差异也包含 A/B alignment，比较时需要考虑这一点。
+`fast`、`fast_mwarp` 要求连续输入的 `N` 和 `K` 都是 4 的倍数；benchmark 会在
+运行前检查这个条件。`fallback`、`fallback_mwarp` 的 A/B alignment 都是 1，
+可以处理 `N` 或 `K` 不是 4 的倍数的 shape。`--kernel all` 包含 fast 实现，
+因此仍要求 `N` 和 `K` 都是 4 的倍数。
 
 修改 C++/CUDA 后先重新编译扩展，再在新 Python 进程中运行：
 

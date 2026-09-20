@@ -23,7 +23,7 @@ if [[ ! "${M}" =~ ^[1-9][0-9]*$ ||
   exit 2
 fi
 
-if [[ "${KERNEL}" == "fast" || "${KERNEL}" == "fast_mwarp" || "${KERNEL}" == "fallback_mwarp" ]] && (( N % 4 != 0 || K % 4 != 0 )); then
+if [[ "${KERNEL}" == "fast" || "${KERNEL}" == "fast_mwarp" ]] && (( N % 4 != 0 || K % 4 != 0 )); then
   echo "${KERNEL} requires N and K to be divisible by 4" >&2
   exit 2
 fi
