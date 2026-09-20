@@ -79,8 +79,8 @@ using Fallback128x128Stage4FP32MWarp = cutlass::gemm::device::Gemm<ElementA,
                                                  FallbackFP32EpilogueOp,
                                                  Swizzle,
                                                  kStages,
-                                                 kAlignmentA,
-                                                 kAlignmentB,
+                                                 1,
+                                                 1,
                                                  false,
                                                  OpMMA
                                                  >;
