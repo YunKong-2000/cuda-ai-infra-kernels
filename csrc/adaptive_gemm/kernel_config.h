@@ -19,9 +19,11 @@ using OpClass = cutlass::arch::OpClassTensorOp;
 using OpMMA = cutlass::arch::OpMultiplyAdd;
 
 using LargeThreadBlockShape = cutlass::gemm::GemmShape<128, 128, 16>;
+using LargeThreadBlockShapeLargeK = cutlass::gemm::GemmShape<128, 128, 32>;
 using MediumThreadBlockShape = cutlass::gemm::GemmShape<128, 64, 16>;
 
 using LargeWarpShape = cutlass::gemm::GemmShape<64, 64, 16>;
+using LargeWarpShapeLargeK = cutlass::gemm::GemmShape<64, 64, 32>;
 using MediumWarpShape = cutlass::gemm::GemmShape<64, 32, 16>;
 using SmallWarpShape = cutlass::gemm::GemmShape<32, 32, 16>;
 
