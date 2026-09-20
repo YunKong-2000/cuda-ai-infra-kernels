@@ -8,6 +8,8 @@ enum class KernelId {
   Auto,
   Fast128x128Stage4FP32,
   Fallback128x128Stage4FP32,
+  Fast128x128Stage4FP32MWarp,
+  Fallback128x128Stage4FP32MWarp,
 };
 
 struct KernelMeta {

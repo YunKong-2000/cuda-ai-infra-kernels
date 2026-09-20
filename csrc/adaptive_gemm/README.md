@@ -246,10 +246,39 @@ python benchmarks/bench_adaptive_gemm.py \
   --kernel all --m 1024 --n 1024 --k 1024
 ```
 
-`all` 会依次测量 PyTorch、向量化 `fast` kernel、标量 `fallback` kernel 和自动
-dispatch。单独测量时可传 `--kernel fast` 或 `--kernel fallback`。`fast` 要求 `N` 和
-`K` 都是 4 的倍数；benchmark 会在运行前检查这个条件。结果默认保存到
+`all` 会依次测量 PyTorch、四个显式 kernel 和自动 dispatch：
+
+| kernel 参数 | Warp tile | A/B alignment（元素） | Epilogue 每次处理元素数 |
+| --- | --- | --- | --- |
+| `fast` | 64×64×16 | 4 | 4 |
+| `fallback` | 64×64×16 | 1 | 1 |
+| `fast_mwarp` | 64×32×16 | 4 | 4 |
+| `fallback_mwarp` | 64×32×16 | 4 | 1 |
+
+四个 kernel 的 threadblock tile 都是 128×128×16，pipeline 都是 4 stages。
+较小 warp tile 对应每个 CTA 从 4 个 warp 增加到 8 个 warp。
+`fallback_mwarp` 当前仍使用向量化 A/B 访问，因此与 `fast`、`fast_mwarp` 一样要求
+连续输入的 `N` 和 `K` 都是 4 的倍数；benchmark 会在运行前检查这个条件。
+它与旧 `fallback` 的差异也包含 A/B alignment，比较时需要考虑这一点。
+
+修改 C++/CUDA 后先重新编译扩展，再在新 Python 进程中运行：
+
+```bash
+python setup.py build_ext --inplace --force
+python benchmarks/bench_adaptive_gemm.py --kernel fast_mwarp --m 4096 --n 4096 --k 4096
+python benchmarks/bench_adaptive_gemm.py --kernel fallback_mwarp --m 4096 --n 4096 --k 4096
+```
+
+Python 中直接指定 `adaptive_gemm(a, b, kernel="fast_mwarp")` 或
+`adaptive_gemm(a, b, kernel="fallback_mwarp")` 即可。显式指定时仅尝试选中的 kernel，
+不兼容就报错，不会静默切换到其他实现。`auto` 按注册表顺序尝试，仍优先运行旧版
+`fast` / `fallback`，不会根据性能自动选择较小 warp tile。
+
+结果默认保存到
 `results/raw/`，使用 `--no-save` 可只打印结果。
+
+当前 benchmark 测量的是包含输出分配和 dispatch 的算子调用，CUDA Event 计时在
+小 shape 下也可能受到主机提交间隔影响；需要具体 kernel 的指标时使用下方的 NCU 脚本。
 
 - 避免把 tensor allocation 和 autotuning 混入 kernel latency；必要时提供 out variant。
 - 报告 TFLOPS、峰值比例，以及 fused workload 的端到端 latency。
@@ -272,7 +301,8 @@ bash profiling/profile_adaptive_gemm.sh \
 ```
 
 脚本只 profile `adaptive_gemm_profile` NVTX 范围内的一次目标 kernel，warmup 和输入
-初始化不会出现在报告里。第一个参数也可以使用 `fallback` 或 `auto`。
+初始化不会出现在报告里。第一个参数也可以使用 `fallback`、`fast_mwarp`、
+`fallback_mwarp` 或 `auto`。
 
 ## 12. 建议阅读顺序
 

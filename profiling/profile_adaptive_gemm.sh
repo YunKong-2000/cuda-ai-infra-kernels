@@ -8,10 +8,10 @@ K="${4:-4096}"
 OUTPUT="${5:-adaptive_gemm_${KERNEL}_${M}x${N}x${K}.ncu-rep}"
 
 case "${KERNEL}" in
-  fast|fallback|auto)
+  fast|fallback|fast_mwarp|fallback_mwarp|auto)
     ;;
   *)
-    echo "kernel must be one of: fast, fallback, auto" >&2
+    echo "kernel must be one of: fast, fallback, fast_mwarp, fallback_mwarp, auto" >&2
     exit 2
     ;;
 esac
@@ -23,8 +23,8 @@ if [[ ! "${M}" =~ ^[1-9][0-9]*$ ||
   exit 2
 fi
 
-if [[ "${KERNEL}" == "fast" ]] && (( N % 4 != 0 || K % 4 != 0 )); then
-  echo "the fast kernel requires N and K to be divisible by 4" >&2
+if [[ "${KERNEL}" == "fast" || "${KERNEL}" == "fast_mwarp" || "${KERNEL}" == "fallback_mwarp" ]] && (( N % 4 != 0 || K % 4 != 0 )); then
+  echo "${KERNEL} requires N and K to be divisible by 4" >&2
   exit 2
 fi
 

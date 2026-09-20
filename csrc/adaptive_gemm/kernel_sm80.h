@@ -22,6 +22,26 @@ using Fast128x128Stage4FP32 = cutlass::gemm::device::Gemm<ElementA,
                                                  OpMMA
                                                  >;
 
+using Fast128x128Stage4FP32MWarp = cutlass::gemm::device::Gemm<ElementA,
+                                                 LayoutA,
+                                                 ElementB,
+                                                 LayoutB,
+                                                 ElementC,
+                                                 LayoutC,
+                                                 ElementAccumulator,
+                                                 OpClass,
+                                                 ArchTag,
+                                                 LargeThreadBlockShape,
+                                                 MediumWarpShape,
+                                                 LargeMultiplyAddShape,
+                                                 FastFP32EpilogueOp,
+                                                 Swizzle,
+                                                 kStages,
+                                                 kAlignmentA,
+                                                 kAlignmentB,
+                                                 false,
+                                                 OpMMA
+                                                 >;
 
 using Fallback128x128Stage4FP32 = cutlass::gemm::device::Gemm<ElementA,
                                                  LayoutA,
@@ -40,6 +60,27 @@ using Fallback128x128Stage4FP32 = cutlass::gemm::device::Gemm<ElementA,
                                                  kStages,
                                                  1,
                                                  1,
+                                                 false,
+                                                 OpMMA
+                                                 >;
+
+using Fallback128x128Stage4FP32MWarp = cutlass::gemm::device::Gemm<ElementA,
+                                                 LayoutA,
+                                                 ElementB,
+                                                 LayoutB,
+                                                 ElementC,
+                                                 LayoutC,
+                                                 ElementAccumulator,
+                                                 OpClass,
+                                                 ArchTag,
+                                                 LargeThreadBlockShape,
+                                                 MediumWarpShape,
+                                                 LargeMultiplyAddShape,
+                                                 FallbackFP32EpilogueOp,
+                                                 Swizzle,
+                                                 kStages,
+                                                 kAlignmentA,
+                                                 kAlignmentB,
                                                  false,
                                                  OpMMA
                                                  >;

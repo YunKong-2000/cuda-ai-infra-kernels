@@ -67,10 +67,16 @@ KernelId parse_kernel(const std::string& value) {
   if (value == "fallback") {
     return KernelId::Fallback128x128Stage4FP32;
   }
+  if (value == "fast_mwarp") {
+    return KernelId::Fast128x128Stage4FP32MWarp;
+  }
+  if (value == "fallback_mwarp") {
+    return KernelId::Fallback128x128Stage4FP32MWarp;
+  }
   TORCH_CHECK(
     false,
     "unsupported adaptive_gemm kernel: ", value,
-    "; expected one of: auto, fast, fallback");
+    "; expected one of: auto, fast, fallback, fast_mwarp, fallback_mwarp");
 }
 
 void check_c(const torch::Tensor& c, const torch::Tensor& a, int64_t m, int64_t n) {

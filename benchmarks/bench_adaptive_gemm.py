@@ -9,7 +9,9 @@ from cuda_ai_kernels.benchmark import cuda_event_benchmark, now_tag, save_json
 from cuda_ai_kernels.env import collect_env
 
 
-KERNELS = ("fast", "fallback")
+KERNELS = ("fast", "fallback", "fast_mwarp", "fallback_mwarp")
+# Both MWarp variants currently use vectorized A/B loads (alignment=4).
+ALIGNED_KERNELS = ("fast", "fast_mwarp", "fallback_mwarp")
 
 
 def make_runner(
@@ -68,9 +70,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--kernel",
-        choices=["fast", "fallback", "auto", "torch", "all"],
+        choices=[*KERNELS, "auto", "torch", "all"],
         default="all",
-        help="'all' benchmarks torch, both compiled kernels, and automatic dispatch.",
+        help="'all' benchmarks torch, all four compiled kernels, and automatic dispatch.",
     )
     parser.add_argument("--m", type=int, default=1024)
     parser.add_argument("--n", type=int, default=1024)
@@ -91,8 +93,8 @@ def main() -> None:
         parser.error("--m, --n, and --k must be positive")
     if args.warmup < 0 or args.repeat <= 0:
         parser.error("--warmup must be non-negative and --repeat must be positive")
-    if args.kernel in {"fast", "all"} and (args.k % 4 != 0 or args.n % 4 != 0):
-        parser.error("the fast kernel requires both K and N to be divisible by 4")
+    if args.kernel in (*ALIGNED_KERNELS, "all") and (args.k % 4 != 0 or args.n % 4 != 0):
+        parser.error("fast, fast_mwarp, and fallback_mwarp require both K and N to be divisible by 4")
     if args.profile and args.kernel == "all":
         parser.error("--profile requires one kernel, not --kernel all")
     if not torch.cuda.is_available():
@@ -138,7 +140,7 @@ def main() -> None:
     for result in results:
         stats = result["stats"]
         print(
-            f"{result['kernel']:>8}: "
+            f"{result['kernel']:>14}: "
             f"mean={stats['mean_ms']:.4f} ms, "
             f"p50={stats['p50_ms']:.4f} ms, "
             f"min={stats['min_ms']:.4f} ms, "

@@ -43,7 +43,7 @@ bool is_compatible(const GemmProblem& problem, const KernelMeta& meta) {
          is_aligned(problem.d, problem.ldd, meta.alignment_c, sizeof(float));
 }
 
-const std::array<KernelEntry, 2> kKernelRegistry{{
+const std::array<KernelEntry, 4> kKernelRegistry{{
   {
     KernelId::Fast128x128Stage4FP32,
     "blocktile128x128stage4vector4",
@@ -57,6 +57,20 @@ const std::array<KernelEntry, 2> kKernelRegistry{{
     EpilogueKind::Linear,
     make_kernel_meta<Fallback128x128Stage4FP32>(),
     &launch_gemm<Fallback128x128Stage4FP32>,
+  },
+  {
+    KernelId::Fast128x128Stage4FP32MWarp,
+    "blocktile128x128stage4vector4warp64x32",
+    EpilogueKind::Linear,
+    make_kernel_meta<Fast128x128Stage4FP32MWarp>(),
+    &launch_gemm<Fast128x128Stage4FP32MWarp>,
+  },
+  {
+    KernelId::Fallback128x128Stage4FP32MWarp,
+    "blocktile128x128stage4scalarwarp64x32",
+    EpilogueKind::Linear,
+    make_kernel_meta<Fallback128x128Stage4FP32MWarp>(),
+    &launch_gemm<Fallback128x128Stage4FP32MWarp>,
   },
 }};
 

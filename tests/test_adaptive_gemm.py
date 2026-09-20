@@ -50,9 +50,10 @@ def test_adaptive_gemm_alpha_beta_matches_torch():
 
 
 @pytest.mark.cuda
-@pytest.mark.parametrize("kernel", ["fast", "fallback"])
-def test_adaptive_gemm_forced_kernel_matches_torch(kernel):
-    m, n, k = 128, 128, 64
+@pytest.mark.parametrize("kernel", ["fast", "fallback", "fast_mwarp", "fallback_mwarp"])
+@pytest.mark.parametrize("shape", [(128, 128, 64), (33, 68, 20)])
+def test_adaptive_gemm_forced_kernel_matches_torch(kernel, shape):
+    m, n, k = shape
     torch.manual_seed(0)
     torch.backends.cuda.matmul.allow_tf32 = True
     a = torch.randn((m, k), device="cuda", dtype=torch.float32)
@@ -68,6 +69,19 @@ def test_adaptive_gemm_forced_kernel_matches_torch(kernel):
         atol=3e-2,
         rtol=3e-2,
     )
+
+
+@pytest.mark.cuda
+@pytest.mark.parametrize("kernel", ["fast", "fast_mwarp", "fallback_mwarp"])
+@pytest.mark.parametrize("shape", [(33, 65, 20), (33, 68, 17)])
+def test_adaptive_gemm_forced_kernel_rejects_misaligned_shape(kernel, shape):
+    m, n, k = shape
+    a = torch.randn((m, k), device="cuda", dtype=torch.float32)
+    b = torch.randn((k, n), device="cuda", dtype=torch.float32)
+
+    # Explicit selection must fail instead of silently running a different kernel.
+    with pytest.raises(RuntimeError, match="adaptive GEMM dispatch failed"):
+        adaptive_gemm(a, b, kernel=kernel)
 
 
 @pytest.mark.cuda
