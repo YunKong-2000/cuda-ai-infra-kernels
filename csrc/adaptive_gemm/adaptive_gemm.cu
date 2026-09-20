@@ -5,6 +5,7 @@
 #include <c10/cuda/CUDAGuard.h>
 
 #include "common/tensor_check.h"
+#include "cublas_reference.h"
 #include "gemm_problem.h"
 #include "kernel_dispatch.h"
 
@@ -61,6 +62,9 @@ KernelId parse_kernel(const std::string& value) {
   if (value == "auto") {
     return KernelId::Auto;
   }
+  if (value == "cublas") {
+    return KernelId::Cublas;
+  }
   if (value == "fast") {
     return KernelId::Fast128x128Stage4FP32;
   }
@@ -82,8 +86,8 @@ KernelId parse_kernel(const std::string& value) {
   TORCH_CHECK(
     false,
     "unsupported adaptive_gemm kernel: ", value,
-    "; expected one of: auto, fast, fallback, fast_mwarp, fallback_mwarp, "
-    "fast_stage3, fast_stage2");
+    "; expected one of: auto, cublas, fast, fallback, fast_mwarp, "
+    "fallback_mwarp, fast_stage3, fast_stage2");
 }
 
 void check_c(const torch::Tensor& c, const torch::Tensor& a, int64_t m, int64_t n) {
@@ -146,6 +150,11 @@ torch::Tensor adaptive_gemm(
   problem.epilogue.kind = epilogue_kind;
   problem.epilogue.alpha = static_cast<float>(alpha);
   problem.epilogue.beta = static_cast<float>(beta);
+
+  if (requested_kernel == KernelId::Cublas) {
+    launch_cublas_reference(problem);
+    return d;
+  }
 
   const cutlass::Status status = dispatch_gemm(problem, requested_kernel);
   TORCH_CHECK(

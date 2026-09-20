@@ -31,6 +31,7 @@ setup(
                 "csrc/rope/rope.cu",
                 "csrc/attention/attention_decode.cu",
                 "csrc/adaptive_gemm/adaptive_gemm.cu",
+                "csrc/adaptive_gemm/cublas_reference.cu",
                 "csrc/adaptive_gemm/gemm_problem.cpp",
                 "csrc/adaptive_gemm/kernel_dispatch.cu",
             ],

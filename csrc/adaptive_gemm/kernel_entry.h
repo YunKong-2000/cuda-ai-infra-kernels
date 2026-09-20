@@ -6,6 +6,7 @@
 
 enum class KernelId {
   Auto,
+  Cublas,
   Fast128x128Stage4FP32,
   Fallback128x128Stage4FP32,
   Fast128x128Stage4FP32MWarp,

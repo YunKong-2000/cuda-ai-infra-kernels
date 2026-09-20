@@ -246,26 +246,37 @@ python benchmarks/bench_adaptive_gemm.py \
   --kernel all --m 1024 --n 1024 --k 1024
 ```
 
-`all` 会依次测量 PyTorch、四个显式 kernel 和自动 dispatch：
+`all` 会依次测量 PyTorch、cuBLAS TF32 baseline、六个显式 CUTLASS kernel 和自动
+dispatch。每行的 `vs_cublas` 表示 cuBLAS mean latency 除以当前实现 mean latency，
+大于 1 表示当前实现更快：
 
-| kernel 参数 | Warp tile | A/B alignment（元素） | Epilogue 每次处理元素数 |
-| --- | --- | --- | --- |
-| `fast` | 64×64×16 | 4 | 4 |
-| `fallback` | 64×64×16 | 1 | 1 |
-| `fast_mwarp` | 64×32×16 | 4 | 4 |
-| `fallback_mwarp` | 64×32×16 | 1 | 1 |
+| kernel 参数 | Warp tile | Stages | A/B alignment（元素） | Epilogue 每次处理元素数 |
+| --- | --- | --- | --- | --- |
+| `cublas` | cuBLAS 自动选择 | cuBLAS 自动选择 | 无额外限制 | cuBLAS 自动选择 |
+| `fast` | 64×64×16 | 4 | 4 | 4 |
+| `fallback` | 64×64×16 | 4 | 1 | 1 |
+| `fast_mwarp` | 64×32×16 | 4 | 4 | 4 |
+| `fallback_mwarp` | 64×32×16 | 4 | 1 | 1 |
+| `fast_stage3` | 64×64×16 | 3 | 4 | 4 |
+| `fast_stage2` | 64×64×16 | 2 | 4 | 4 |
 
-四个 kernel 的 threadblock tile 都是 128×128×16，pipeline 都是 4 stages。
+六个 CUTLASS kernel 的 threadblock tile 都是 128×128×16。
 较小 warp tile 对应每个 CTA 从 4 个 warp 增加到 8 个 warp。
-`fast`、`fast_mwarp` 要求连续输入的 `N` 和 `K` 都是 4 的倍数；benchmark 会在
-运行前检查这个条件。`fallback`、`fallback_mwarp` 的 A/B alignment 都是 1，
-可以处理 `N` 或 `K` 不是 4 的倍数的 shape。`--kernel all` 包含 fast 实现，
-因此仍要求 `N` 和 `K` 都是 4 的倍数。
+所有 `fast` 变体要求连续输入的 `N` 和 `K` 都是 4 的倍数；benchmark 会在运行前
+检查这个条件。`fallback`、`fallback_mwarp` 的 A/B alignment 都是 1，可以处理
+`N` 或 `K` 不是 4 的倍数的 shape。`--kernel all` 包含 fast 实现，因此仍要求
+`N` 和 `K` 都是 4 的倍数。
+
+cuBLAS baseline 使用 `cublasGemmEx` 和 `CUBLAS_COMPUTE_32F_FAST_TF32`，与 SM80
+CUTLASS Tensor Core kernel 使用相同的 FP32 输入、TF32 乘法和 FP32 累加口径。默认
+benchmark 的 `beta=0` 不包含额外数据拷贝；当 API 使用非零 `beta` 和独立 C tensor
+时，经典 cuBLAS 接口要求先把 C 拷贝到输出 D，这部分拷贝也属于该调用的耗时。
 
 修改 C++/CUDA 后先重新编译扩展，再在新 Python 进程中运行：
 
 ```bash
 python setup.py build_ext --inplace --force
+python benchmarks/bench_adaptive_gemm.py --kernel cublas --m 4096 --n 4096 --k 4096
 python benchmarks/bench_adaptive_gemm.py --kernel fast_mwarp --m 4096 --n 4096 --k 4096
 python benchmarks/bench_adaptive_gemm.py --kernel fallback_mwarp --m 4096 --n 4096 --k 4096
 ```
@@ -302,8 +313,8 @@ bash profiling/profile_adaptive_gemm.sh \
 ```
 
 脚本只 profile `adaptive_gemm_profile` NVTX 范围内的一次目标 kernel，warmup 和输入
-初始化不会出现在报告里。第一个参数也可以使用 `fallback`、`fast_mwarp`、
-`fallback_mwarp` 或 `auto`。
+初始化不会出现在报告里。第一个参数也可以使用 `cublas`、`fallback`、`fast_mwarp`、
+`fallback_mwarp`、`fast_stage3`、`fast_stage2` 或 `auto`。
 
 ## 12. 建议阅读顺序
 

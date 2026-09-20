@@ -17,6 +17,7 @@ KERNELS = (
     "fast_stage3",
     "fast_stage2",
 )
+CUBLAS_BASELINE = "cublas"
 # Only the fast variants require vectorized A/B loads (alignment=4).
 ALIGNED_KERNELS = ("fast", "fast_mwarp", "fast_stage3", "fast_stage2")
 
@@ -77,9 +78,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--kernel",
-        choices=[*KERNELS, "auto", "torch", "all"],
+        choices=[*KERNELS, CUBLAS_BASELINE, "auto", "torch", "all"],
         default="all",
-        help="'all' benchmarks torch, all six compiled kernels, and automatic dispatch.",
+        help=(
+            "'all' benchmarks torch, the cuBLAS TF32 baseline, all six CUTLASS "
+            "kernels, and automatic dispatch."
+        ),
     )
     parser.add_argument("--m", type=int, default=1024)
     parser.add_argument("--n", type=int, default=1024)
@@ -129,15 +133,28 @@ def main() -> None:
     expected = torch.matmul(a, b)
     torch.cuda.synchronize()
 
-    kernels = ["torch", *KERNELS, "auto"] if args.kernel == "all" else [args.kernel]
+    kernels = (
+        ["torch", CUBLAS_BASELINE, *KERNELS, "auto"]
+        if args.kernel == "all"
+        else [args.kernel]
+    )
     results = [
         benchmark_kernel(kernel, a, b, expected, args.warmup, args.repeat)
         for kernel in kernels
     ]
+    cublas_result = next(
+        (result for result in results if result["kernel"] == CUBLAS_BASELINE),
+        None,
+    )
+    if cublas_result is not None:
+        cublas_mean_ms = cublas_result["stats"]["mean_ms"]
+        for result in results:
+            result["speedup_vs_cublas"] = cublas_mean_ms / result["stats"]["mean_ms"]
     payload = {
         "benchmark": "adaptive_gemm",
         "shape": {"m": args.m, "n": args.n, "k": args.k},
         "dtype": "fp32_tf32",
+        "cublas_compute_type": "CUBLAS_COMPUTE_32F_FAST_TF32",
         "warmup": args.warmup,
         "repeat": args.repeat,
         "results": results,
@@ -146,12 +163,15 @@ def main() -> None:
 
     for result in results:
         stats = result["stats"]
+        speedup = result.get("speedup_vs_cublas")
+        speedup_text = f", vs_cublas={speedup:.3f}x" if speedup is not None else ""
         print(
             f"{result['kernel']:>14}: "
             f"mean={stats['mean_ms']:.4f} ms, "
             f"p50={stats['p50_ms']:.4f} ms, "
             f"min={stats['min_ms']:.4f} ms, "
             f"TFLOPS={result['tflops_mean']:.2f}"
+            f"{speedup_text}"
         )
 
     if args.no_save:
