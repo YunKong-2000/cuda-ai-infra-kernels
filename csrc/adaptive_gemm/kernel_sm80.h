@@ -126,3 +126,46 @@ using Fast128x128Stage2FP32 = cutlass::gemm::device::Gemm<ElementA,
                                                  false,
                                                  OpMMA
                                                  >;
+
+using Fast128x128Stage4FP32Relu = cutlass::gemm::device::Gemm<ElementA,
+                                                 LayoutA,
+                                                 ElementB,
+                                                 LayoutB,
+                                                 ElementC,
+                                                 LayoutC,
+                                                 ElementAccumulator,
+                                                 OpClass,
+                                                 ArchTag,
+                                                 LargeThreadBlockShape,
+                                                 LargeWarpShape,
+                                                 LargeMultiplyAddShape,
+                                                 FastFP32ReluEpilogueOp,
+                                                 Swizzle,
+                                                 kStages,
+                                                 kAlignmentA,
+                                                 kAlignmentB,
+                                                 false,
+                                                 OpMMA
+                                                 >;
+
+
+using Fallback128x128Stage4FP32Relu = cutlass::gemm::device::Gemm<ElementA,
+                                                 LayoutA,
+                                                 ElementB,
+                                                 LayoutB,
+                                                 ElementC,
+                                                 LayoutC,
+                                                 ElementAccumulator,
+                                                 OpClass,
+                                                 ArchTag,
+                                                 LargeThreadBlockShape,
+                                                 LargeWarpShape,
+                                                 LargeMultiplyAddShape,
+                                                 FallbackFP32ReluEpilogueOp,
+                                                 Swizzle,
+                                                 kStages,
+                                                 1,
+                                                 1,
+                                                 false,
+                                                 OpMMA
+                                                 >;

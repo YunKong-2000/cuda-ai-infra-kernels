@@ -1,5 +1,8 @@
 #pragma once
 #include "cutlass/gemm/device/gemm.h"
+#include "cutlass/epilogue/thread/linear_combination_relu.h"
+#include "cutlass/epilogue/thread/linear_combination_silu.h"
+#include "cutlass/epilogue/thread/linear_combination_gelu.h"
 
 using ElementAccumulator = float;
 using ElementEpilogue = float;
@@ -34,7 +37,14 @@ inline constexpr int kAlignmentA = 128 / cutlass::sizeof_bits<ElementA>::value;
 inline constexpr int kAlignmentB = 128 / cutlass::sizeof_bits<ElementB>::value;
 
 using FastFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<ElementC, 4, ElementAccumulator, ElementEpilogue>;
+using FastFP32ReluEpilogueOp = cutlass::epilogue::thread::LinearCombinationRelu<ElementC, 4, ElementAccumulator, ElementEpilogue>;
+using FastFP32SiluEpilogueOp = cutlass::epilogue::thread::LinearCombinationSilu<ElementC, 4, ElementAccumulator, ElementEpilogue>;
+using FastFP32GeluEpilogueOp = cutlass::epilogue::thread::LinearCombinationGELU<ElementC, 4, ElementAccumulator, ElementEpilogue>;
 using FallbackFP32EpilogueOp = cutlass::epilogue::thread::LinearCombination<ElementC, 1, ElementAccumulator, ElementEpilogue>;
+using FallbackFP32ReluEpilogueOp = cutlass::epilogue::thread::LinearCombinationRelu<ElementC, 1, ElementAccumulator, ElementEpilogue>;
+using FallbackFP32SiluEpilogueOp = cutlass::epilogue::thread::LinearCombinationSilu<ElementC, 1, ElementAccumulator, ElementEpilogue>;
+using FallbackFP32GeluEpilogueOp = cutlass::epilogue::thread::LinearCombinationGELU<ElementC, 1, ElementAccumulator, ElementEpilogue>;
+
 
 using Swizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>;
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import platform
 
 import torch
@@ -14,4 +16,3 @@ def collect_env() -> dict[str, str | int | None]:
         "gpu": torch.cuda.get_device_name(device) if device is not None else None,
         "capability": ".".join(map(str, torch.cuda.get_device_capability(device))) if device is not None else None,
     }
-

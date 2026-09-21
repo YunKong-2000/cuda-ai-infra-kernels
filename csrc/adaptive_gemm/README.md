@@ -1,7 +1,27 @@
 # A100 Shape-Adaptive Fused GEMM 学习项目
 
-这个目录包含项目设计、FP32 LinearCombination baseline、kernel registry 和运行时
-dispatcher。bias、activation、更多 tile/dtype、专项 benchmark 和 profiling 仍待完成。
+这个目录包含项目设计、FP32 LinearCombination / ReLU kernel、kernel registry 和运行时
+dispatcher。bias、其他 activation 和更多 tile/dtype 仍待完成。
+
+当前 ReLU 语义为 `D = relu(alpha * A @ B + beta * C)`。使用
+`epilogue="relu"` 搭配 `kernel="auto"`、`"fast_relu"` 或 `"fallback_relu"`；
+保留 `"fast_Relu"` / `"fallback_Relu"` 作为兼容别名。fast 要求 A/B/C/D
+满足 4 元素对齐，fallback 支持非对齐尺寸。显式选择不兼容的 kernel 会报错。
+`kernel="cublas"` 仅支持 linear，ReLU benchmark 使用 cuBLAS 输出后单独执行
+`torch.relu` 作为非融合基线。
+
+```bash
+python -m pytest tests/test_adaptive_gemm.py tests/test_bench_adaptive_gemm.py -q
+python benchmarks/bench_adaptive_gemm.py --epilogue relu --kernel all --m 1024 --n 1024 --k 1024
+python benchmarks/bench_adaptive_gemm.py --epilogue relu --kernel all --m 33 --n 65 --k 17
+python benchmarks/bench_adaptive_gemm.py --epilogue relu --kernel fast_relu --alpha 0.75 --beta 0.25
+```
+
+ReLU 的 `--kernel all` 比较 torch+ReLU、cuBLAS+ReLU、两个融合 kernel、
+两个对应的 CUTLASS+ReLU 非融合版本及 auto；非对齐尺寸自动跳过 fast 版本。
+所有计时包含完整后处理，先对照 FP32 reference 检查正确性，再用 CUDA Events
+计时。JSON 记录 epilogue、alpha/beta、融合标记和跳过的 kernel；TFLOPS 使用
+`2*M*N*K / 完整计算耗时`，不计 ReLU 的操作数。
 
 ## 1. 项目目标
 

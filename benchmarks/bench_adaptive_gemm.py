@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 from collections.abc import Callable
 from typing import Any
@@ -17,19 +19,39 @@ KERNELS = (
     "fast_stage3",
     "fast_stage2",
 )
+RELU_KERNELS = ("fast_relu", "fallback_relu")
+UNFUSED_RELU_KERNELS = ("fast+relu", "fallback+relu")
 CUBLAS_BASELINE = "cublas"
 # Only the fast variants require vectorized A/B loads (alignment=4).
-ALIGNED_KERNELS = ("fast", "fast_mwarp", "fast_stage3", "fast_stage2")
+ALIGNED_KERNELS = ("fast", "fast_mwarp", "fast_stage3", "fast_stage2", "fast_relu", "fast+relu")
 
 
 def make_runner(
     kernel: str,
     a: torch.Tensor,
     b: torch.Tensor,
+    epilogue: str = "linear",
+    c: torch.Tensor | None = None,
+    alpha: float = 1.0,
+    beta: float = 0.0,
 ) -> Callable[[], torch.Tensor]:
     if kernel == "torch":
-        return lambda: torch.matmul(a, b)
-    return lambda: adaptive_gemm(a, b, kernel=kernel)
+        def run_torch() -> torch.Tensor:
+            result = torch.matmul(a, b)
+            if alpha != 1.0:
+                result = alpha * result
+            if beta != 0.0:
+                result = result + beta * c
+            return torch.relu(result) if epilogue == "relu" else result
+        return run_torch
+    if epilogue == "relu" and kernel in (CUBLAS_BASELINE, *UNFUSED_RELU_KERNELS):
+        linear_kernel = kernel.removesuffix("+relu")
+        return lambda: torch.relu(adaptive_gemm(
+            a, b, c=c, alpha=alpha, beta=beta, epilogue="linear", kernel=linear_kernel,
+        ))
+    return lambda: adaptive_gemm(
+        a, b, c=c, alpha=alpha, beta=beta, epilogue=epilogue, kernel=kernel,
+    )
 
 
 def check_correctness(
@@ -57,14 +79,20 @@ def benchmark_kernel(
     expected: torch.Tensor,
     warmup: int,
     repeat: int,
+    epilogue: str = "linear",
+    c: torch.Tensor | None = None,
+    alpha: float = 1.0,
+    beta: float = 0.0,
 ) -> dict[str, Any]:
-    run = make_runner(kernel, a, b)
+    run = make_runner(kernel, a, b, epilogue, c, alpha, beta)
     correctness = check_correctness(run, expected)
     stats = cuda_event_benchmark(run, warmup=warmup, repeat=repeat)
     operations = 2.0 * a.size(0) * b.size(1) * a.size(1)
 
     return {
         "kernel": kernel,
+        "epilogue": epilogue,
+        "fused_relu": epilogue == "relu" and kernel in (*RELU_KERNELS, "auto"),
         "tflops_mean": operations / (stats["mean_ms"] * 1e-3) / 1e12,
         "tflops_min_latency": operations / (stats["min_ms"] * 1e-3) / 1e12,
         "stats": stats,
@@ -74,17 +102,20 @@ def benchmark_kernel(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Benchmark the FP32 adaptive GEMM kernels with CUDA Events."
+        description="Benchmark FP32 adaptive GEMM with linear or ReLU epilogues using CUDA Events."
     )
     parser.add_argument(
         "--kernel",
-        choices=[*KERNELS, CUBLAS_BASELINE, "auto", "torch", "all"],
+        choices=[*KERNELS, *RELU_KERNELS, *UNFUSED_RELU_KERNELS, CUBLAS_BASELINE, "auto", "torch", "all"],
         default="all",
         help=(
-            "'all' benchmarks torch, the cuBLAS TF32 baseline, all six CUTLASS "
-            "kernels, and automatic dispatch."
+            "'all' benchmarks compatible kernels for --epilogue, torch, cuBLAS, "
+            "and auto. ReLU includes unfused cuBLAS/CUTLASS + torch.relu baselines."
         ),
     )
+    parser.add_argument("--epilogue", choices=["linear", "relu"], default="linear")
+    parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--beta", type=float, default=0.0)
     parser.add_argument("--m", type=int, default=1024)
     parser.add_argument("--n", type=int, default=1024)
     parser.add_argument("--k", type=int, default=1024)
@@ -104,7 +135,11 @@ def main() -> None:
         parser.error("--m, --n, and --k must be positive")
     if args.warmup < 0 or args.repeat <= 0:
         parser.error("--warmup must be non-negative and --repeat must be positive")
-    if args.kernel in (*ALIGNED_KERNELS, "all") and (args.k % 4 != 0 or args.n % 4 != 0):
+    if args.epilogue == "linear" and args.kernel in (*RELU_KERNELS, *UNFUSED_RELU_KERNELS):
+        parser.error("ReLU kernels require --epilogue relu")
+    if args.epilogue == "relu" and args.kernel in KERNELS:
+        parser.error("use fast_relu/fallback_relu for fusion or fast+relu/fallback+relu for an unfused baseline")
+    if args.kernel in ALIGNED_KERNELS and (args.k % 4 != 0 or args.n % 4 != 0):
         parser.error("fast kernels require both K and N to be divisible by 4")
     if args.profile and args.kernel == "all":
         parser.error("--profile requires one kernel, not --kernel all")
@@ -115,9 +150,17 @@ def main() -> None:
     torch.backends.cuda.matmul.allow_tf32 = True
     a = torch.randn((args.m, args.k), device="cuda", dtype=torch.float32)
     b = torch.randn((args.k, args.n), device="cuda", dtype=torch.float32)
+    c = torch.randn((args.m, args.n), device="cuda", dtype=torch.float32) if args.beta != 0 else None
+
+    # Full FP32 correctness reference; timed torch/cuBLAS baselines retain TF32.
+    torch.backends.cuda.matmul.allow_tf32 = False
+    expected = make_runner("torch", a, b, args.epilogue, c, args.alpha, args.beta)()
+    torch.cuda.synchronize()
+    torch.backends.cuda.matmul.allow_tf32 = True
 
     if args.profile:
-        run = make_runner(args.kernel, a, b)
+        run = make_runner(args.kernel, a, b, args.epilogue, c, args.alpha, args.beta)
+        check_correctness(run, expected)
         for _ in range(args.warmup):
             run()
         torch.cuda.synchronize()
@@ -130,16 +173,20 @@ def main() -> None:
         torch.cuda.synchronize()
         return
 
-    expected = torch.matmul(a, b)
-    torch.cuda.synchronize()
-
+    candidates = KERNELS if args.epilogue == "linear" else (*RELU_KERNELS, *UNFUSED_RELU_KERNELS)
     kernels = (
-        ["torch", CUBLAS_BASELINE, *KERNELS, "auto"]
+        ["torch", CUBLAS_BASELINE, *candidates, "auto"]
         if args.kernel == "all"
         else [args.kernel]
     )
+    skipped = []
+    if args.kernel == "all" and (args.k % 4 != 0 or args.n % 4 != 0):
+        skipped = [kernel for kernel in kernels if kernel in ALIGNED_KERNELS]
+        kernels = [kernel for kernel in kernels if kernel not in skipped]
+        print(f"skipping unaligned kernels: {', '.join(skipped)}")
     results = [
-        benchmark_kernel(kernel, a, b, expected, args.warmup, args.repeat)
+        benchmark_kernel(kernel, a, b, expected, args.warmup, args.repeat,
+                         args.epilogue, c, args.alpha, args.beta)
         for kernel in kernels
     ]
     cublas_result = next(
@@ -154,6 +201,12 @@ def main() -> None:
         "benchmark": "adaptive_gemm",
         "shape": {"m": args.m, "n": args.n, "k": args.k},
         "dtype": "fp32_tf32",
+        "epilogue": args.epilogue,
+        "alpha": args.alpha,
+        "beta": args.beta,
+        "skipped_kernels": skipped,
+        "cublas_baseline": "cublas+torch.relu" if args.epilogue == "relu" else "cublas",
+        "tflops_basis": "2*M*N*K (GEMM FLOPs / full operation latency)",
         "cublas_compute_type": "CUBLAS_COMPUTE_32F_FAST_TF32",
         "warmup": args.warmup,
         "repeat": args.repeat,
@@ -164,9 +217,13 @@ def main() -> None:
     for result in results:
         stats = result["stats"]
         speedup = result.get("speedup_vs_cublas")
-        speedup_text = f", vs_cublas={speedup:.3f}x" if speedup is not None else ""
+        baseline = "cublas+relu" if args.epilogue == "relu" else "cublas"
+        speedup_text = f", vs_{baseline}={speedup:.3f}x" if speedup is not None else ""
+        label = result["kernel"]
+        if args.epilogue == "relu" and label in ("torch", "cublas"):
+            label += "+relu"
         print(
-            f"{result['kernel']:>14}: "
+            f"{label:>14}: "
             f"mean={stats['mean_ms']:.4f} ms, "
             f"p50={stats['p50_ms']:.4f} ms, "
             f"min={stats['min_ms']:.4f} ms, "
@@ -176,7 +233,7 @@ def main() -> None:
 
     if args.no_save:
         return
-    output_path = args.save or f"results/raw/adaptive_gemm_{args.kernel}_{now_tag()}.json"
+    output_path = args.save or f"results/raw/adaptive_gemm_{args.epilogue}_{args.kernel}_{now_tag()}.json"
     save_json(output_path, payload)
     print(f"saved: {output_path}")
 

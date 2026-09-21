@@ -70,6 +70,7 @@ def check_project_includes() -> None:
             candidates = [
                 path.parent / include,
                 CSRC / include,
+                ROOT / "third_party" / "cutlass" / "include" / include,
             ]
             if not any(candidate.is_file() for candidate in candidates):
                 rel = path.relative_to(ROOT)
@@ -119,4 +120,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

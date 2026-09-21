@@ -61,6 +61,11 @@ def adaptive_gemm(
     epilogue: str = "linear",
     kernel: str = "auto",
 ) -> torch.Tensor:
+    """Compute alpha * A @ B + beta * C, optionally followed by ReLU.
+
+    Use epilogue="relu" with kernel="auto", "fast_relu", or "fallback_relu".
+    The explicit cuBLAS reference supports only the linear epilogue.
+    """
     c_arg = c.contiguous() if c is not None else None
     bias_arg = bias.contiguous() if bias is not None else None
     return _C.adaptive_gemm(

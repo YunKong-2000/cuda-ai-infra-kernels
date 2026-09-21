@@ -83,11 +83,17 @@ KernelId parse_kernel(const std::string& value) {
   if (value == "fast_stage2") {
     return KernelId::Fast128x128Stage2FP32;
   }
+  if (value == "fast_relu" || value == "fast_Relu") {
+    return KernelId::Fast128x128Stage4FP32Relu;
+  }
+  if (value == "fallback_relu" || value == "fallback_Relu") {
+    return KernelId::Fallback128x128Stage4FP32Relu;
+  }
   TORCH_CHECK(
     false,
     "unsupported adaptive_gemm kernel: ", value,
     "; expected one of: auto, cublas, fast, fallback, fast_mwarp, "
-    "fallback_mwarp, fast_stage3, fast_stage2");
+    "fallback_mwarp, fast_stage3, fast_stage2, fast_relu, fallback_relu");
 }
 
 void check_c(const torch::Tensor& c, const torch::Tensor& a, int64_t m, int64_t n) {
@@ -116,8 +122,12 @@ torch::Tensor adaptive_gemm(
   const EpilogueKind epilogue_kind = parse_epilogue(epilogue);
   const KernelId requested_kernel = parse_kernel(kernel);
   TORCH_CHECK(
-    epilogue_kind == EpilogueKind::Linear,
-    "adaptive_gemm currently supports only the linear epilogue");
+    epilogue_kind == EpilogueKind::Linear || epilogue_kind == EpilogueKind::Relu,
+    "adaptive_gemm currently supports only the linear and relu epilogues");
+  TORCH_CHECK(
+    requested_kernel != KernelId::Cublas || epilogue_kind == EpilogueKind::Linear,
+    "adaptive_gemm kernel='cublas' supports only the linear epilogue; "
+    "apply torch.relu to its output for an unfused ReLU baseline");
 
   const bool has_bias = bias.has_value() && bias->defined();
   TORCH_CHECK(!has_bias, "adaptive_gemm bias fusion is not implemented yet");
