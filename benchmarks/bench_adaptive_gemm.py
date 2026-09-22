@@ -54,21 +54,49 @@ def make_runner(
     )
 
 
+def make_references(
+    run_torch: Callable[[], torch.Tensor],
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Use TF32-allowed PyTorch for validation and full FP32 for diagnostics."""
+    previous = torch.backends.cuda.matmul.allow_tf32
+    try:
+        torch.backends.cuda.matmul.allow_tf32 = True
+        expected = run_torch()
+        torch.cuda.synchronize()
+        torch.backends.cuda.matmul.allow_tf32 = False
+        fp32_expected = run_torch()
+        torch.cuda.synchronize()
+    finally:
+        torch.backends.cuda.matmul.allow_tf32 = previous
+    return expected, fp32_expected
+
+
+def error_metrics(actual: torch.Tensor, expected: torch.Tensor) -> dict[str, float]:
+    absolute_error = (actual - expected).abs()
+    relative_error = absolute_error / expected.abs().clamp_min(1e-7)
+    return {
+        "max_absolute_error": absolute_error.max().item(),
+        "max_relative_error": relative_error.max().item(),
+    }
+
+
 def check_correctness(
     run: Callable[[], torch.Tensor],
     expected: torch.Tensor,
-) -> dict[str, float]:
+    fp32_expected: torch.Tensor,
+) -> dict[str, Any]:
     actual = run()
     torch.cuda.synchronize()
-    absolute_error = (actual - expected).abs()
-    relative_error = absolute_error / expected.abs().clamp_min(1e-7)
-    max_absolute_error = absolute_error.max().item()
-    max_relative_error = relative_error.max().item()
 
+    # Keep validation against the performance baseline. FP32 error is reported
+    # separately and does not gate TF32 performance measurements.
     torch.testing.assert_close(actual, expected, atol=3e-2, rtol=3e-2)
     return {
-        "max_absolute_error": max_absolute_error,
-        "max_relative_error": max_relative_error,
+        "reference": "torch_tf32_allowed",
+        "atol": 3e-2,
+        "rtol": 3e-2,
+        **error_metrics(actual, expected),
+        "vs_fp32": error_metrics(actual, fp32_expected),
     }
 
 
@@ -77,6 +105,7 @@ def benchmark_kernel(
     a: torch.Tensor,
     b: torch.Tensor,
     expected: torch.Tensor,
+    fp32_expected: torch.Tensor,
     warmup: int,
     repeat: int,
     epilogue: str = "linear",
@@ -85,7 +114,7 @@ def benchmark_kernel(
     beta: float = 0.0,
 ) -> dict[str, Any]:
     run = make_runner(kernel, a, b, epilogue, c, alpha, beta)
-    correctness = check_correctness(run, expected)
+    correctness = check_correctness(run, expected, fp32_expected)
     stats = cuda_event_benchmark(run, warmup=warmup, repeat=repeat)
     operations = 2.0 * a.size(0) * b.size(1) * a.size(1)
 
@@ -102,7 +131,10 @@ def benchmark_kernel(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Benchmark FP32 adaptive GEMM with linear or ReLU epilogues using CUDA Events."
+        description=(
+            "Benchmark FP32/TF32 adaptive GEMM using CUDA Events. Validate against "
+            "TF32-allowed PyTorch and report full FP32 error separately."
+        )
     )
     parser.add_argument(
         "--kernel",
@@ -152,15 +184,16 @@ def main() -> None:
     b = torch.randn((args.k, args.n), device="cuda", dtype=torch.float32)
     c = torch.randn((args.m, args.n), device="cuda", dtype=torch.float32) if args.beta != 0 else None
 
-    # Full FP32 correctness reference; timed torch/cuBLAS baselines retain TF32.
-    torch.backends.cuda.matmul.allow_tf32 = False
-    expected = make_runner("torch", a, b, args.epilogue, c, args.alpha, args.beta)()
-    torch.cuda.synchronize()
-    torch.backends.cuda.matmul.allow_tf32 = True
+    # Both references are generated outside timing/profiling; timed torch keeps
+    # TF32 enabled. Allowing TF32 does not force a particular PyTorch algorithm.
+    expected, fp32_expected = make_references(
+        make_runner("torch", a, b, args.epilogue, c, args.alpha, args.beta)
+    )
 
     if args.profile:
         run = make_runner(args.kernel, a, b, args.epilogue, c, args.alpha, args.beta)
-        check_correctness(run, expected)
+        correctness = check_correctness(run, expected, fp32_expected)
+        print(f"correctness (torch TF32 allowed): {correctness}")
         for _ in range(args.warmup):
             run()
         torch.cuda.synchronize()
@@ -185,7 +218,7 @@ def main() -> None:
         kernels = [kernel for kernel in kernels if kernel not in skipped]
         print(f"skipping unaligned kernels: {', '.join(skipped)}")
     results = [
-        benchmark_kernel(kernel, a, b, expected, args.warmup, args.repeat,
+        benchmark_kernel(kernel, a, b, expected, fp32_expected, args.warmup, args.repeat,
                          args.epilogue, c, args.alpha, args.beta)
         for kernel in kernels
     ]
@@ -208,6 +241,9 @@ def main() -> None:
         "cublas_baseline": "cublas+torch.relu" if args.epilogue == "relu" else "cublas",
         "tflops_basis": "2*M*N*K (GEMM FLOPs / full operation latency)",
         "cublas_compute_type": "CUBLAS_COMPUTE_32F_FAST_TF32",
+        "torch_allow_tf32": True,
+        "correctness_reference": "torch_tf32_allowed",
+        "precision_reference": "torch_fp32_tf32_disabled",
         "warmup": args.warmup,
         "repeat": args.repeat,
         "results": results,
@@ -216,6 +252,7 @@ def main() -> None:
 
     for result in results:
         stats = result["stats"]
+        correctness = result["correctness"]
         speedup = result.get("speedup_vs_cublas")
         baseline = "cublas+relu" if args.epilogue == "relu" else "cublas"
         speedup_text = f", vs_{baseline}={speedup:.3f}x" if speedup is not None else ""
@@ -229,6 +266,8 @@ def main() -> None:
             f"min={stats['min_ms']:.4f} ms, "
             f"TFLOPS={result['tflops_mean']:.2f}"
             f"{speedup_text}"
+            f", max_abs_vs_torch_tf32_allowed={correctness['max_absolute_error']:.6g}"
+            f", max_abs_vs_fp32={correctness['vs_fp32']['max_absolute_error']:.6g}"
         )
 
     if args.no_save:

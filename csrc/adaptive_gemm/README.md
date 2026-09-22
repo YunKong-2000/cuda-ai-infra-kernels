@@ -292,6 +292,15 @@ CUTLASS Tensor Core kernel 使用相同的 FP32 输入、TF32 乘法和 FP32 累
 benchmark 的 `beta=0` 不包含额外数据拷贝；当 API 使用非零 `beta` 和独立 C tensor
 时，经典 cuBLAS 接口要求先把 C 拷贝到输出 D，这部分拷贝也属于该调用的耗时。
 
+benchmark 的一致性检查以允许 TF32 的 PyTorch 结果为参考，使用
+`atol=3e-2, rtol=3e-2`；计时期间 PyTorch 同样允许 TF32。另在计时前生成禁用
+TF32 的完整 FP32 参考值，仅用于报告精度损失，不用该误差阻断 TF32 性能测量。
+终端分别打印两种参考值的最大绝对误差；JSON 的 `correctness` 记录与允许 TF32
+参考值的误差，`correctness.vs_fp32` 记录与完整 FP32 参考值的误差，均包含最大
+绝对误差和最大相对误差。`--profile` 使用相同检查，参考计算在 NVTX 范围之外。
+允许 TF32 不保证 PyTorch 采用特定 Tensor Core 算法，也不保证与 CUTLASS 逐位相同；
+如果与允许 TF32 的参考值仍然超出容差，benchmark 会继续报错，需要检查数值差异。
+
 修改 C++/CUDA 后先重新编译扩展，再在新 Python 进程中运行：
 
 ```bash
