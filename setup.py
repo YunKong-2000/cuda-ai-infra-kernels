@@ -21,8 +21,12 @@ setup(
                 "csrc/gemm/gemm_naive.cu",
                 "csrc/gemm/gemm_cublas.cu",
                 "csrc/gemm/gemm_block_tile.cu",
+                "csrc/gemm/gemm_block_tile_float4.cu",
                 "csrc/gemm/gemm_thread_tile.cu",
                 "csrc/gemm/gemm_warp_tile.cu",
+                "csrc/gemm/gemm_prefetchSmem.cu",
+                "csrc/gemm/gemm_prefetchRegister.cu",
+                "csrc/gemm/gemm_splictK.cu",
                 "csrc/gemm/gemm_tensor_core.cu",
                 "csrc/gemm/gemm_cutlass.cu",
                 "csrc/rmsnorm/rmsnorm_naive.cu",
@@ -42,7 +46,10 @@ setup(
             libraries=["cublas"],
             extra_compile_args={
                 "cxx": ["-O3"],
-                "nvcc": ["-O3", "--use_fast_math", "--generate-line-info", "-gencode=arch=compute_80,code=sm_80"],
+                # Let PyTorch honor TORCH_CUDA_ARCH_LIST or detect the GPU.
+                # The prefetch kernels require SM80+; do not hard-code sm_80
+                # cubins, which cannot run on a different major architecture.
+                "nvcc": ["-O3", "--use_fast_math", "--generate-line-info"],
             },
         )
     ],

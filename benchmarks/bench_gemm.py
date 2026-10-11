@@ -3,6 +3,7 @@ import argparse
 import torch
 
 from cuda_ai_kernels import gemm
+from cuda_ai_kernels.gemm_stages import COLUMN_MAJOR_IMPLS, GEMM_STAGE_IMPLS
 from cuda_ai_kernels.benchmark import cuda_event_benchmark, now_tag, save_json
 from cuda_ai_kernels.env import collect_env
 
@@ -11,7 +12,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--impl",
-        choices=["torch", "cublas", "naive", "block_tile", "thread_tile", "warp_tile", "tensor_core", "cutlass"],
+        choices=["torch", *GEMM_STAGE_IMPLS, "thread_tile", "tensor_core", "cutlass"],
         default="naive",
     )
     parser.add_argument("--m", type=int, default=1024)
@@ -25,6 +26,8 @@ def main() -> None:
 
     torch.manual_seed(0)
     a = torch.randn((args.m, args.k), device="cuda", dtype=torch.float32)
+    if args.impl in COLUMN_MAJOR_IMPLS:
+        a = a.t().contiguous().t()
     b = torch.randn((args.k, args.n), device="cuda", dtype=torch.float32)
 
     def run():

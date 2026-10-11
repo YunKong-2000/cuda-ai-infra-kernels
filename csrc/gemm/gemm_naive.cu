@@ -1,6 +1,4 @@
-#include "gemm/gemm.h"
-
-
+#include "gemm/gemm_regular.cuh"
 
 void check_gemm_inputs(const torch::Tensor& a, const torch::Tensor& b) {
   CHECK_INPUT(a);
@@ -16,50 +14,33 @@ void check_gemm_inputs(const torch::Tensor& a, const torch::Tensor& b) {
 }
 
 namespace {
+constexpr int BM = 16;
+constexpr int BN = 16;
+
 __global__ void gemm_naive_kernel(
-    const float* __restrict__ a,
-    const float* __restrict__ b,
-    float* __restrict__ c,
-    int m,
-    int n,
-    int k) {
-  const int row = blockIdx.y * blockDim.y + threadIdx.y;
-  const int col = blockIdx.x * blockDim.x + threadIdx.x;
-
-  if (row >= m || col >= n) {
-    return;
+    const float* __restrict__ A,
+    const float* __restrict__ B,
+    float* __restrict__ C,
+    const int M, const int N, const int K)
+{
+  const int row = blockIdx.y * BM + threadIdx.y;
+  const int col = blockIdx.x * BN + threadIdx.x;
+  float acc = 0;
+  for (int k = 0; k < K; k++) {
+    acc += A[int64_t(k) * M + row] * B[int64_t(k) * N + col];
   }
-
-  float acc = 0.0f;
-  for (int i = 0; i < k; ++i) {
-    acc += a[row * k + i] * b[i * n + col];
-  }
-
-  c[row * n + col] = acc;
+  C[int64_t(row) * N + col] = acc;
 }
-
-}  // namespace
+} // namespace
 
 torch::Tensor gemm_naive(torch::Tensor a, torch::Tensor b) {
-  check_gemm_inputs(a, b);
-
-  const int m = static_cast<int>(a.size(0));
-  const int k = static_cast<int>(a.size(1));
-  const int n = static_cast<int>(b.size(1));
-
-  auto c = torch::empty({m, n}, a.options());
-
-  dim3 block(16, 16);
-  dim3 grid(ceil_div(n, static_cast<int>(block.x)), ceil_div(m, static_cast<int>(block.y)));
-
-  gemm_naive_kernel<<<grid, block>>>(
-      a.data_ptr<float>(),
-      b.data_ptr<float>(),
-      c.data_ptr<float>(),
-      m,
-      n,
-      k);
-  CUDA_CHECK(cudaGetLastError());
-
+  check_regular_gemm_inputs(a, b, BM, BN, 1, false);
+  const int M = a.size(0), K = a.size(1), N = b.size(1);
+  const c10::cuda::CUDAGuard device_guard(a.device());
+  auto c = torch::empty({M, N}, a.options());
+  const auto stream = c10::cuda::getCurrentCUDAStream(a.get_device());
+  gemm_naive_kernel<<<dim3(N / BN, M / BM), dim3(BN, BM), 0, stream.stream()>>>(
+      a.data_ptr<float>(), b.data_ptr<float>(), c.data_ptr<float>(), M, N, K);
+  C10_CUDA_KERNEL_LAUNCH_CHECK();
   return c;
 }

@@ -12,7 +12,16 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gemm_cublas", &gemm_cublas, "cuBLAS FP32 GEMM");
   m.def("gemm_block_tile", &gemm_block_tile, "Shared-memory tiled FP32 GEMM");
   m.def("gemm_thread_tile", &gemm_thread_tile, "Thread-tiled FP32 GEMM");
+  m.def("gemm_block_tile_float4_16x16", &gemm_block_tile_float4_16x16, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_block_tile_float4_16x32", &gemm_block_tile_float4_16x32, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_block_tile_float4_32x32", &gemm_block_tile_float4_32x32, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_thread_tile_4x4", &gemm_thread_tile_4x4, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_thread_tile_4x8", &gemm_thread_tile_4x8, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_thread_tile_8x8", &gemm_thread_tile_8x8, "Full-tile FP32 GEMM: column-major A, row-major B/C");
   m.def("gemm_warp_tile", &gemm_warp_tile, "Warp-level FP32 GEMM");
+  m.def("gemm_prefetch_smem", &gemm_prefetchSmem, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_prefetch_reg", &gemm_prefetchReg, "Register-prefetch FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_split_k", &gemm_splictK, "Two-slice atomic Split-K FP32 GEMM: column-major A, row-major B/C");
   m.def("gemm_tensor_core", &gemm_tensor_core, "TF32 GEMM using Warp-level Tensor Core");
   m.def("gemm_cutlass", &gemm_cutlass, "cutlass gemm");
   m.def("rmsnorm_naive", &rmsnorm_naive, "naive RMSNorm forward");

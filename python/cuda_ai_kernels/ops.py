@@ -3,6 +3,7 @@ from typing import Optional
 import torch
 
 from cuda_ai_kernels import _C
+from cuda_ai_kernels.gemm_stages import COLUMN_MAJOR_IMPLS
 
 
 _GEMM_IMPLS = {
@@ -10,8 +11,17 @@ _GEMM_IMPLS = {
     "naive": _C.gemm_naive,
     "block_tile": _C.gemm_block_tile,
     "thread_tile": _C.gemm_thread_tile,
+    "block_tile_float4_16x16": _C.gemm_block_tile_float4_16x16,
+    "block_tile_float4_16x32": _C.gemm_block_tile_float4_16x32,
+    "block_tile_float4_32x32": _C.gemm_block_tile_float4_32x32,
+    "thread_tile_4x4": _C.gemm_thread_tile_4x4,
+    "thread_tile_4x8": _C.gemm_thread_tile_4x8,
+    "thread_tile_8x8": _C.gemm_thread_tile_8x8,
     "warp_tile": _C.gemm_warp_tile,
     "tensor_core": _C.gemm_tensor_core,
+    "prefetch_smem": _C.gemm_prefetch_smem,
+    "prefetch_reg": _C.gemm_prefetch_reg,
+    "split_k": _C.gemm_split_k,
     "cutlass": _C.gemm_cutlass
 }
 
@@ -26,8 +36,18 @@ _SOFTMAX_IMPLS = {
 
 
 def gemm(a: torch.Tensor, b: torch.Tensor, impl: str = "naive") -> torch.Tensor:
+    """Compute FP32 A[M,K] @ B[K,N].
+
+    The optimization ladder requires column-major A (strides 1,M), row-major
+    B and full positive tiles. No layout conversion is performed. See
+    gemm_stages.GEMM_STAGES for each implementation's (BM, BN, BK) multiples.
+    thread_tile aliases thread_tile_4x4. cuBLAS also accepts row-major A.
+    Tensor Core/CUTLASS retain their existing row-major interfaces.
+    """
     if impl not in _GEMM_IMPLS:
         raise ValueError(f"unknown GEMM impl: {impl}")
+    if impl in COLUMN_MAJOR_IMPLS:
+        return _GEMM_IMPLS[impl](a, b)
     return _GEMM_IMPLS[impl](a.contiguous(), b.contiguous())
 
 
