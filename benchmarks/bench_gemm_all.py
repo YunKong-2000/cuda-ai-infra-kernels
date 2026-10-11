@@ -11,7 +11,16 @@ from cuda_ai_kernels.env import collect_env
 from cuda_ai_kernels.gemm_stages import GEMM_STAGES
 
 
-DEFAULT_SHAPES = ("128,128,128", "512,512,512", "1024,1024,1024", "128,256,4096")
+# M,N,K order; matches the seven columns in the reference speedup heatmap.
+DEFAULT_SHAPES = (
+    "256,256,256",
+    "1024,1024,1024",
+    "2048,2048,2048",
+    "4096,4096,2048",
+    "4096,1024,4096",
+    "1024,4096,4096",
+    "4096,4096,4096",
+)
 
 
 def parse_shape(value):
