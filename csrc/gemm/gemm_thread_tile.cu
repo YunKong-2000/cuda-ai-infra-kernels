@@ -6,7 +6,9 @@ constexpr int BN = 128;
 constexpr int BK = 8;
 
 template<int TM, int TN>
-__global__ void gemm_thread_tile_kernel(
+// In particular, 4x4 uses 1024 threads. Let ptxas budget registers for the
+// actual block size instead of optimizing for an unspecified launch size.
+__global__ __launch_bounds__((BM / TM) * (BN / TN)) void gemm_thread_tile_kernel(
     const float* __restrict__ A,
     const float* __restrict__ B,
     float* __restrict__ C,

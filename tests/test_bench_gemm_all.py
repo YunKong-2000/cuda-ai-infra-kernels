@@ -68,6 +68,36 @@ class TestGemmAllBenchmark(TestCase):
             with self.subTest(shape=value), self.assertRaises(argparse.ArgumentTypeError):
                 self.bench.parse_shape(value)
 
+    def test_launch_error_identifies_stage_before_timing(self):
+        a, b = self.bench.make_inputs(128, 256, 16, device="cpu")
+        expected = (a.double() @ b.double()).float()
+        failure = RuntimeError("CUDA error: too many resources requested for launch")
+
+        def fake_gemm(a, b, *, impl):
+            if impl == "thread_tile_4x4":
+                raise failure
+            return expected
+
+        with mock.patch.object(self.bench, "gemm", fake_gemm), \
+             mock.patch.object(self.bench, "cuda_graph_benchmark") as timer:
+            with self.assertRaisesRegex(
+                RuntimeError, r"stage 4 \(thread_tile_4x4\).*validation.*M=128 N=256 K=16.*too many resources"
+            ) as error:
+                self.bench.benchmark_shape(a, b)
+            self.assertIs(error.exception.__cause__, failure)
+            timer.assert_not_called()
+
+    def test_timing_error_identifies_implementation_and_mode(self):
+        a, b = self.bench.make_inputs(128, 256, 16, device="cpu")
+        expected = (a.double() @ b.double()).float()
+        for mode, timer_name in (("graph", "cuda_graph_benchmark"),
+                                 ("event", "cuda_event_benchmark")):
+            with self.subTest(mode=mode), \
+                 mock.patch.object(self.bench, "gemm", return_value=expected), \
+                 mock.patch.object(self.bench, timer_name, side_effect=RuntimeError("timing failed")):
+                with self.assertRaisesRegex(RuntimeError, rf"stage 1 \(naive\).*{mode} timing"):
+                    self.bench.benchmark_shape(a, b, timing=mode)
+
     def test_dispatch_preserves_layout_and_identity_for_every_stage(self):
         import cuda_ai_kernels
         extension = types.ModuleType("cuda_ai_kernels._C")

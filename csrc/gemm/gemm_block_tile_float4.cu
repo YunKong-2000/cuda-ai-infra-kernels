@@ -4,7 +4,9 @@ namespace {
 constexpr int BK = 8;
 
 template<int BM, int BN>
-__global__ void gemm_block_tile_float4_kernel(
+// The 32x32 specialization launches 1024 threads; constrain register usage
+// for that launch as well as the smaller specializations.
+__global__ __launch_bounds__(BM * BN) void gemm_block_tile_float4_kernel(
     const float* __restrict__ A,
     const float* __restrict__ B,
     float* __restrict__ C,

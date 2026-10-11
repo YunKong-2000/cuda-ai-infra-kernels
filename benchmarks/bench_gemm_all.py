@@ -85,7 +85,17 @@ def benchmark_shape(a, b, *, warmup=10, repeat=50, timing="graph"):
     # Every variant sees exactly the same tensors and must pass before timing.
     for stage, name, tile in GEMM_STAGES:
         runners[name] = lambda name=name: gemm(a, b, impl=name)
-        actual = runners[name]()
+        try:
+            actual = runners[name]()
+            # Validation is outside timing/graph capture. Attribute asynchronous
+            # failures to this implementation before moving to the next one.
+            if a.is_cuda:
+                torch.cuda.synchronize(a.device)
+        except RuntimeError as error:
+            raise RuntimeError(
+                f"GEMM stage {stage} ({name}) failed during validation: "
+                f"M={a.size(0)} N={b.size(1)} K={a.size(1)}; {error}"
+            ) from error
         if not actual.is_contiguous():
             raise AssertionError(f"{name}: C must be row-major contiguous")
         torch.testing.assert_close(actual, expected, atol=1e-3, rtol=1e-3,
@@ -99,7 +109,13 @@ def benchmark_shape(a, b, *, warmup=10, repeat=50, timing="graph"):
     n = b.size(1)
     timer = cuda_graph_benchmark if timing == "graph" else cuda_event_benchmark
     for row in results:
-        stats = timer(runners[row["impl"]], warmup=warmup, repeat=repeat)
+        try:
+            stats = timer(runners[row["impl"]], warmup=warmup, repeat=repeat)
+        except RuntimeError as error:
+            raise RuntimeError(
+                f"GEMM stage {row['stage']} ({row['impl']}) failed during "
+                f"{timing} timing: M={m} N={n} K={k}; {error}"
+            ) from error
         row.update(stats=stats, tflops=2.0 * m * n * k / (stats["mean_ms"] * 1e9))
     cublas_ms = results[-1]["stats"]["mean_ms"]
     naive_ms = results[0]["stats"]["mean_ms"]
