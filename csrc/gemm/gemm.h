@@ -24,3 +24,4 @@ torch::Tensor gemm_block_tile_float4_32x32(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_thread_tile_4x4(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_thread_tile_4x8(torch::Tensor a, torch::Tensor b);
 torch::Tensor gemm_thread_tile_8x8(torch::Tensor a, torch::Tensor b);
+torch::Tensor gemm_thread_tile_8x8_warp4x8(torch::Tensor a, torch::Tensor b);

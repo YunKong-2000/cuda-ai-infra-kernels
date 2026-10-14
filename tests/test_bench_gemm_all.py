@@ -49,7 +49,7 @@ class TestGemmAllBenchmark(TestCase):
              mock.patch.object(self.bench, "cuda_graph_benchmark", timer):
             rows = self.bench.benchmark_shape(a, b, warmup=2, repeat=3)
         self.assertEqual(timed, list(GEMM_STAGE_IMPLS))
-        self.assertEqual(len(rows), 13)
+        self.assertEqual(len(rows), len(GEMM_STAGE_IMPLS))
         self.assertEqual(rows[0]["speedup_over_cublas"], 2)
         self.assertEqual(rows[-1]["speedup_over_cublas"], 1)
         self.assertAlmostEqual(rows[0]["tflops"], 2 * 128 * 256 * 16 / 1e9)

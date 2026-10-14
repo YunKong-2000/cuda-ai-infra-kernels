@@ -17,6 +17,7 @@ _GEMM_IMPLS = {
     "thread_tile_4x4": _C.gemm_thread_tile_4x4,
     "thread_tile_4x8": _C.gemm_thread_tile_4x8,
     "thread_tile_8x8": _C.gemm_thread_tile_8x8,
+    "thread_tile_8x8_warp4x8": _C.gemm_thread_tile_8x8_warp4x8,
     "warp_tile": _C.gemm_warp_tile,
     "tensor_core": _C.gemm_tensor_core,
     "prefetch_smem": _C.gemm_prefetch_smem,

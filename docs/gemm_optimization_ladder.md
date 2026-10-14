@@ -12,19 +12,22 @@
 | 4 | `thread_tile_4x4` | 128×128×8 | 1024 | 连续 4×4 |
 | 4 | `thread_tile_4x8` | 128×128×8 | 512 | 连续 4×8 |
 | 4 | `thread_tile_8x8` | 128×128×8 | 256 | 连续 8×8 |
+| 4 | `thread_tile_8x8_warp4x8` | 128×128×8 | 256 | 连续 8×8，warp 内线程按 4×8 排列 |
 | 5 | `warp_tile` | 128×128×8 | 256 | 8×8 拆成四个 4×4 子块 |
-| 6 | `prefetch_smem` | 128×128×8 | 256 | 原有 smem 双缓冲 |
-| 7 | `prefetch_reg` | 128×128×8 | 256 | 原有 smem + register 双缓冲 |
-| 8 | `split_k` | 128×128×8，每个输出 tile 两个 CTA | 256 | 原有两路 K 切分、atomicAdd |
+| 6 | `prefetch_smem` | 128×128×8 | 256 | smem 双缓冲 |
+| 7 | `prefetch_reg` | 128×128×8 | 256 | smem + register 双缓冲 |
+| 8 | `split_k` | 128×128×8，每个输出 tile 两个 CTA | 256 | 两路 K 切分、atomicAdd |
 | 9 | `cublas` | 库选择 | 库选择 | 严格 FP32 对照 |
 
-CUDA 每个 block 最多 1024 个线程。为保留第 3 阶段“一线程一元素”，按确认后的方案将原计划的 64×64 / 64×128 / 128×128 缩小为上述三种尺寸。第 4 阶段才扩展到 128×128，并复用 A/B 寄存器向量做外积。三种 thread tile 使用同一个 block tile，因此同时改变线程数与每线程寄存器需求；性能不保证随阶段递增。
+CUDA 每个 block 最多 1024 个线程。第 3 阶段保持“一线程一元素”，因此使用 16×16、16×32 和 32×32 tile。第 4 阶段才扩展到 128×128，并复用 A/B 寄存器向量做外积。三种 thread tile 使用同一个 block tile，因此同时改变线程数与每线程寄存器需求；性能不保证随阶段递增。
 
 第 2～5 阶段均只有一份 `As[BK][BM]`、`Bs[BK][BN]`，搬运后同步，计算完成再同步后覆盖。float4 沿 A 的 M 维、B 的 N 维搬运，均对应连续物理内存。第 4 阶段从 smem 读取连续 TM/TN 寄存器向量，第 5 阶段沿 M/N 各读两个相隔的 float4。
 
+两个连续 8×8 变体共享计算、搬运、同步和写回代码，仅改变线程输出坐标映射。原版 `thread_tile_8x8` 的 warp 内线程按 2×16 排列，每个 warp 覆盖 16×128。新增 `thread_tile_8x8_warp4x8` 按 4×8 排列，每个 warp 覆盖 32×64；block 内的 8 个 warp 按 4×2 排列。两者均为 256 线程、8 KiB shared memory、每线程 64 个累加器，并采用相同 launch bounds；最终寄存器数量与性能仍需编译和实测确认。
+
 第 5 阶段与现有第 6～8 阶段采用相同映射：block 含 2×4 个 warp，每个 warp 覆盖 64×32；lane 按 8×4 排列，每线程持有两组连续 4 行、两组连续 4 列，行组间距 32、列组间距 16，组合出四个 4×4 子块。第 5 阶段没有预取或双缓冲。
 
-`thread_tile` 保留为 `thread_tile_4x4` 的别名；全量测试不重复计入别名。旧 thread/warp 文件中混合的边界处理、额外 pipeline、未使用的 kernel 已删除。`gemm_prefetchSmem.cu`、`gemm_prefetchRegister.cu`、`gemm_splictK.cu` 原样保留；Tensor Core/CUTLASS 不参与这条 FP32 链路，保留原入口和实现。cuBLAS 保留对行主序 A 的兼容，但本脚本只向它传同一份列主序 A。
+`thread_tile` 保留为 `thread_tile_4x4` 的别名；全量测试不重复计入别名。共享内存预取、寄存器预取和 Split-K 分别位于 `gemm_prefetchSmem.cu`、`gemm_prefetchRegister.cu`、`gemm_splictK.cu`；Tensor Core/CUTLASS 不参与这条 FP32 链路，保留原入口和实现。cuBLAS 保留对行主序 A 的兼容，但本脚本只向它传同一份列主序 A。
 
 ## 一键编译、校验和性能对比
 
@@ -34,7 +37,7 @@ CUDA 每个 block 最多 1024 个线程。为保留第 3 阶段“一线程一�
 bash scripts/bench_gemm_all.sh
 ```
 
-脚本先 `setup.py build_ext --inplace`，再测试全部 13 个入口。现有 `cp.async` kernel 需要 SM80+；构建使用仓库 `setup.py`，由 PyTorch 检测目标 GPU，或通过 `TORCH_CUDA_ARCH_LIST` 显式指定，例如 A100 使用 `8.0`、RTX 4090 使用 `8.9`。无可见 GPU 时必须显式指定；CUDA toolkit 需支持目标架构。也可用 `make bench-gemm-all`。指定解释器与尺寸：
+脚本先 `setup.py build_ext --inplace`，再测试全部 14 个入口。现有 `cp.async` kernel 需要 SM80+；构建使用仓库 `setup.py`，由 PyTorch 检测目标 GPU，或通过 `TORCH_CUDA_ARCH_LIST` 显式指定，例如 A100 使用 `8.0`、RTX 4090 使用 `8.9`。无可见 GPU 时必须显式指定；CUDA toolkit 需支持目标架构。也可用 `make bench-gemm-all`。指定解释器与尺寸：
 
 ```bash
 PYTHON=python3 bash scripts/bench_gemm_all.sh \
@@ -44,7 +47,7 @@ PYTHON=python3 bash scripts/bench_gemm_all.sh \
 
 全量共同约束：`M % 128 == 0`、`N % 128 == 0`、`K % 16 == 0`，且均为正数。Split-K 的每个 K 分片需为 8 的倍数，因此共同 K 约束是 16。单独调用各个实现时，M/N/K 仅需满足表中对应倍数；naive 对 K 没有整除限制。向量化实现要求 A/B 起始地址 16 字节对齐。
 
-默认规模与参考加速比热力图的七列一致，顺序为 `M×N×K`：`256×256×256`、`1024×1024×1024`、`2048×2048×2048`、`4096×4096×2048`、`4096×1024×4096`、`1024×4096×4096`、`4096×4096×4096`。每种规模测试全部 13 个实现，共 91 个“规模 × 实现”组合；`--shapes` 可覆盖默认列表。
+默认覆盖七组规模，顺序为 `M×N×K`：`256×256×256`、`1024×1024×1024`、`2048×2048×2048`、`4096×4096×2048`、`4096×1024×4096`、`1024×4096×4096`、`4096×4096×4096`。每种规模测试全部 14 个实现，共 98 个“规模 × 实现”组合；`--shapes` 可覆盖默认列表。
 
 每个尺寸生成一次 A/B，所有 kernel 和 cuBLAS 共用同一对象、相同物理布局。首先与独立 FP64 matmul 转 FP32 的结果逐项校验（`atol=rtol=1e-3`）；任一实现失败则退出，不为错误结果报性能。验证通过后才进行计时。
 
@@ -57,6 +60,7 @@ PYTHON=python3 bash scripts/bench_gemm_all.sh \
 ```bash
 PYTHONPATH=python python3 benchmarks/bench_gemm_all.py --shapes 128,256,16
 PYTHONPATH=python python3 benchmarks/bench_gemm.py --impl thread_tile_4x8 --m 1024 --n 1024 --k 1024
+PYTHONPATH=python python3 benchmarks/bench_gemm.py --impl thread_tile_8x8_warp4x8 --m 1024 --n 1024 --k 1024
 ```
 
 ## Python 调用与回归测试
@@ -80,3 +84,7 @@ compute-sanitizer --tool racecheck python3 -m pytest -q tests/test_gemm.py -k re
 ```
 
 新增 CUDA 用例覆盖最小 tile、多 block、矩形尺寸、单/多 K tile、错误布局/尺寸/地址对齐、非默认 stream 和 graph replay。CPU 测试检查同输入、先校验再计时、失败中止、性能比值以及 Python 分发不复制输入。
+
+## 历史性能数据
+
+A800 测量和原始 CSV 见 [性能记录](gemm_optimization_log.md)。历史表包含额外布局变体，且以中位耗时计算吞吐；本页描述当前 14 项入口及 mean 统计口径。

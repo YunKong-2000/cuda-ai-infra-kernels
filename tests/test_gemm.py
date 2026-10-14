@@ -54,6 +54,20 @@ VECTOR_IMPLS = [name for stage, name, _ in GEMM_STAGES if 3 <= stage <= 5]
 
 
 @pytest.mark.cuda
+@pytest.mark.parametrize("impl", ["thread_tile_8x8", "thread_tile_8x8_warp4x8"])
+def test_contiguous_thread_tile_output_coordinates(impl):
+    # Distinct row/column values expose swapped or duplicated thread/warp tiles,
+    # including the transition between adjacent CTAs in both dimensions.
+    m, n, k = 256, 384, 24
+    rows = torch.arange(1, m + 1, device="cuda", dtype=torch.float32)
+    cols = torch.arange(1, n + 1, device="cuda", dtype=torch.float32)
+    a = rows.expand(k, m).contiguous().t()
+    b = cols.expand(k, n).contiguous()
+    expected = k * rows[:, None] * cols[None, :]
+    torch.testing.assert_close(gemm(a, b, impl=impl), expected, atol=0, rtol=0)
+
+
+@pytest.mark.cuda
 @pytest.mark.parametrize("impl", REGULAR_IMPLS)
 @pytest.mark.parametrize("shape", [(128, 128, 8), (128, 256, 24), (256, 128, 64)])
 def test_regular_gemm_matches_fp64(impl, shape):

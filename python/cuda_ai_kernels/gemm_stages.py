@@ -10,6 +10,7 @@ GEMM_STAGES = (
     (4, "thread_tile_4x4", (128, 128, 8)),
     (4, "thread_tile_4x8", (128, 128, 8)),
     (4, "thread_tile_8x8", (128, 128, 8)),
+    (4, "thread_tile_8x8_warp4x8", (128, 128, 8)),
     (5, "warp_tile", (128, 128, 8)),
     (6, "prefetch_smem", (128, 128, 8)),
     (7, "prefetch_reg", (128, 128, 8)),

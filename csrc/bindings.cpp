@@ -18,6 +18,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("gemm_thread_tile_4x4", &gemm_thread_tile_4x4, "Full-tile FP32 GEMM: column-major A, row-major B/C");
   m.def("gemm_thread_tile_4x8", &gemm_thread_tile_4x8, "Full-tile FP32 GEMM: column-major A, row-major B/C");
   m.def("gemm_thread_tile_8x8", &gemm_thread_tile_8x8, "Full-tile FP32 GEMM: column-major A, row-major B/C");
+  m.def("gemm_thread_tile_8x8_warp4x8", &gemm_thread_tile_8x8_warp4x8, "Contiguous 8x8 thread tiles with a 4x8 thread layout per warp");
   m.def("gemm_warp_tile", &gemm_warp_tile, "Warp-level FP32 GEMM");
   m.def("gemm_prefetch_smem", &gemm_prefetchSmem, "Full-tile FP32 GEMM: column-major A, row-major B/C");
   m.def("gemm_prefetch_reg", &gemm_prefetchReg, "Register-prefetch FP32 GEMM: column-major A, row-major B/C");
